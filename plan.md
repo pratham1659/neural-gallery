@@ -1,276 +1,272 @@
-# Encrypted Local Gallery & AI Vault for Mac Silicon
-## Comprehensive Architecture, Technology Evaluation & Implementation Plan
+# Neural Gallery — Master Architecture & Implementation Plan
 
-> **Project Goal:** Build an ultra-fast, zero-knowledge encrypted media vault for Apple Silicon featuring Google Photos-style timeline navigation, natural language semantic search, face recognition, and peer-to-peer mobile Wi-Fi synchronization.  
-> **Open Source Distribution:** Distributed 100% free on GitHub without requiring a paid Apple Developer Account ($99/year).
-
----
-
-## 1. Technology Evaluation: Swift vs. React Native vs. Tauri v2 (Rust)
-
-A central architectural decision is choosing the right desktop foundation. Below is the detailed comparative analysis:
-
-| Criteria | Option A: React Native macOS | Option B: Pure Swift (SwiftUI + AppKit) | Option C (Recommended): Tauri v2 (Rust + React) |
-| :--- | :--- | :--- | :--- |
-| **Runtime & Performance** | Heavy. Runs JavaScriptCore/Hermes + React Native bridge. | Extremely fast. Native compiled binary with direct Metal/GPU access. | **Fastest backend.** Rust compiled to native ARM64 with zero-cost abstractions; UI rendered via macOS WebKit (`WKWebView`). |
-| **Memory & Security** | Garbage-collected memory. Hard to guarantee decrypted image buffers and cryptographic keys are zeroed out of RAM. | Manual memory management possible, but Swift ARC can retain buffers in memory pools. | **Best-in-class security.** Rust's `zeroize` trait guarantees sensitive buffers, IVs, and keys are scrubbed from RAM immediately when dropped. |
-| **Apple Native Frameworks (`Vision`, `CoreML`, `LocalAuthentication`)** | Complex and brittle. Requires writing custom C++/Objective-C++ Turbo Modules. | **First-class native.** Apple's Swift APIs for Vision, CoreML, and Touch ID are native and immediate. | **Seamless via FFI.** Rust communicates directly with Objective-C/Swift frameworks via `objc2` or a thin Swift static library. |
-| **UI Ecosystem & Virtualization** | Fragile. `react-native-macos` is a Microsoft-maintained fork that frequently lags behind upstream React Native. | Native macOS controls, but building complex virtualized masonry photo grids in SwiftUI can hit performance bottlenecks. | **Vast & mature.** Access to the entire modern web ecosystem (`@tanstack/react-virtual`, Tailwind CSS, Lucide icons, KaTeX, MapLibre). |
-| **Binary Size & RAM** | 80–120 MB binary; 150–300 MB RAM. | ~10–20 MB binary; 40–80 MB RAM. | **~15 MB binary; 40–70 MB RAM.** |
-| **Open Source Build without Paid Dev Account** | Painful. Xcode provisioning and CocoaPods dependencies frequently break for community contributors. | Requires Xcode, but builds cleanly with ad-hoc signing. | **Frictionless.** Compiles via `cargo tauri build` on standard GitHub Actions runners with no Xcode license hurdles. |
-
-### Architectural Decision: Why Tauri v2 (Rust) + React Wins
-1. **Why NOT React Native macOS:** `react-native-macos` introduces heavy build complexity (CocoaPods, Metro bundler, out-of-tree React forks), high memory overhead, and complicated FFI for Core ML / Vision. It is not suitable for a lightweight, privacy-focused desktop application.
-2. **Why Tauri v2 over Pure Swift:** While pure Swift is fantastic for Apple-only tooling, Rust provides unmatched cryptographic ergonomics (`zeroize`, `aes-gcm`, `argon2`), effortless cross-platform potential (enabling the same core logic for mobile companion sync), and gives us the rich web ecosystem for virtualized timeline zooming.
-3. **The Hybrid Native Bridge:** For Apple Silicon-specific acceleration (Apple Neural Engine and Apple Vision), Rust will interface with a lightweight native Swift bridge module.
+**Project Version:** 2.0.0-PROD  
+**Author:** Principal Systems Architect & Lead Desktop Security Engineer  
+**Target Platform:** macOS Sonoma 14+ / Sequoia 15+ (Apple Silicon: M1/M2/M3/M4 Native ARM64)  
+**Security Classification:** Strict Zero-Knowledge / Air-Gapped / Defense-in-Depth  
+**Distribution Model:** 100% Free Open Source on GitHub (Releases `.dmg` + Homebrew Cask)
 
 ---
 
-## 2. Zero-Cost Open Source Distribution Strategy (No Apple Developer Account)
+## 1. Executive Summary & Core Architectural Decisions
 
-Without paying Apple $99/year for a Developer ID certificate, macOS Gatekeeper flags downloaded DMGs as untrusted. Here is the open-source distribution plan:
+Neural Gallery is an encrypted, zero-knowledge media gallery and AI vault engineered natively for Apple Silicon Macs. It combines the fluid usability of Apple Photos and Google Photos with the verifiable security of an air-gapped cryptographic vault:
 
-### 2.1. Ad-Hoc Signing (ARM64 Mandatory)
-Apple Silicon Macs require all binaries to possess at least an ad-hoc signature to execute:
+1. **Zero-Cloud Guarantee:** Photos never leave your personal hardware. All indexing, face recognition, pet tracking, OCR text extraction, and semantic natural language search execute on-device using Apple Silicon hardware.
+2. **P2P Wi-Fi Synchronization:** Air-gapped peer-to-peer sync between macOS, iOS, and Android over local Wi-Fi via Bonjour/mDNS, ephemeral TLS 1.3, and 6-digit SAS PIN pairing—bypassing iCloud, Google One, and all third-party relays.
+3. **Defense-in-Depth Cryptography:** Encrypted container storage (EVFS) using AES-256-GCM / XChaCha20-Poly1305, Argon2id key derivation, and SQLCipher 4.6+ database encryption. RAM buffers are locked (`mlock`) and zeroized on lock (`zeroize::ZeroizeOnDrop`) to prevent disk swap leakage.
+4. **Frictionless Open-Source Distribution:** Native standalone packaging using **Tauri 2.0 (Rust) + React 19**, generating lightweight ~25 MB `.dmg` installers built via automated GitHub Actions with zero paid Apple Developer account hurdles.
+
+---
+
+## 2. Definitive Tech Stack & Subsystem Matrix
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                        FRONTEND: React 19 + TypeScript + Vite                          │
+│ • Glassmorphism UI (Apple HIG Light & Obsidian Dark)                                   │
+│ • 60–120fps Virtualized Timeline (TanStack Virtual)                                    │
+│ • Places & Geography Map Explorer (Interactive Vector Canvas)                          │
+│ • People & Pets Face Tracking (Live Bounding Boxes, Candidate Face Confirmation)       │
+│ • Finder-Grade File Manager & EXIF / Optical Telemetry Inspector Sidebar (`⌘I`)        │
+└───────────────────────────────────────────┬────────────────────────────────────────────┘
+                                            │ Tauri 2.0 IPC (Binary Channels)
+                                            ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                    DESKTOP CORE & EMBEDDED BACKEND: Tauri 2.0 (Rust)                   │
+│ • Zero-Knowledge Memory Guard (`mlock` page pinning, `zeroize` on drop)                │
+│ • Instant Panic Lockdown (`⌘L`, screensaver, sleep triggers within < 10ms)             │
+│ • Encrypted Virtual File System (EVFS: AES-256-GCM / XChaCha20 `.aev` blocks)          │
+│ • P2P Wi-Fi Sync Engine (Bonjour mDNS daemon + Ephemeral TLS 1.3 + Local PWA Server)   │
+└─────────────────────┬──────────────────────────────────────────────────┬───────────────┘
+                      │                                                  │
+                      ▼ Swift C-ABI Bridge                               ▼ Embedded C/Rust
+┌──────────────────────────────────────────────┐ ┌───────────────────────────────────────┐
+│     NATIVE APPLE SILICON ACCELERATION        │ │           DATABASE & SEARCH           │
+│           (Swift .dylib)                     │ │      (Encrypted Embedded SQLite)      │
+│ • Apple Vision: Human Faces, Pets (Dogs/Cats)│ │ • SQLCipher 4.6+ (AES-256-CBC, HMAC)  │
+│ • Apple Vision: Accurate Multi-Language OCR  │ │ • sqlite-vec: 768-d Vector Embeddings │
+│ • Core ML / ANE: MobileCLIP-B Semantic Search│ │ • SQLite FTS5: OCR Full-Text Search   │
+│ • Secure Enclave: Touch ID / Master Key Wrap │ │ • Spatial R*Tree: Geocache Indexing   │
+└──────────────────────────────────────────────┘ └───────────────────────────────────────┘
+```
+
+| Subsystem | Technology | Purpose & Rationale |
+| :--- | :--- | :--- |
+| **Frontend Presentation** | **React 19 + TypeScript + Vite** | Modular, reactive UI component architecture adhering to Apple HIG glassmorphism. |
+| **Virtualization & Styling** | **TanStack Virtual + Tailwind CSS** | Sustains 60–120 fps ProMotion inertial scrolling across 50,000+ to 250,000+ assets with Years $\leftrightarrow$ Months $\leftrightarrow$ Days pinch-to-zoom. |
+| **Icons & Visual Language** | **Microsoft Fluent 3D Illustrative Icons** | Professional, high-aesthetic 3D iconography replacing unicode emojis across all categories. |
+| **Desktop Application Shell** | **Tauri 2.0 (Rust ARM64)** | High-performance native macOS binary; eliminates heavy Electron/Node.js runtimes (~25MB binary, ~30MB idle RAM); native window vibrancy (`titleBarStyle = "Overlay"`, frosted glass blur). |
+| **Memory Security** | **Rust `zeroize` + `libc::mlock`** | Locks cryptographic keys and decrypted image buffers in physical RAM (preventing disk swap leakage); scrubs secrets deterministically on drop. |
+| **Hardware Acceleration Bridge**| **Swift C-ABI Dynamic Library (`.dylib`)** | Direct zero-copy bridge interfacing Rust with Apple Silicon Unified Memory Architecture (`CVPixelBuffer`). |
+| **Computer Vision & Pet Tracking** | **Apple Vision Framework** | On-device face detection (`VNDetectFaceRectanglesRequest`), landmarks, pet detection (`VNRecognizeAnimalsRequest`), and accurate OCR (`VNRecognizeTextRequest`). |
+| **Semantic AI Search** | **Core ML / Apple Neural Engine (ANE)** | Quantized **MobileCLIP-B (LT)** model compiling to Core ML (`.mlpackage`) with `computeUnits = .all` for $< 20\text{ms}$ multimodal vector queries. |
+| **Encrypted Database** | **SQLCipher 4.6+ (WAL mode)** | Full database page encryption (AES-256-CBC, HMAC-SHA512). Raw ciphertext on disk; plaintext resides solely in memory pages. |
+| **Vector Similarity Index** | **`sqlite-vec` (C Extension)** | In-process vector database executing cosine distance searches across 768-d MobileCLIP embeddings in $< 35\text{ms}$. |
+| **Full-Text OCR Search** | **SQLite FTS5** | Instant full-text search across tokenized text extracted from receipts, documents, and screenshots. |
+| **Storage Encryption (EVFS)** | **Argon2id + AES-256-GCM / XChaCha20** | Master Key derived via Argon2id ($m=64\text{ MiB}, t=3, p=4$); chunked stream encryption with unique 96-bit IVs into `.aev` blocks. |
+| **Hardware Biometrics** | **`LocalAuthentication` (Swift)** | Touch ID and Secure Enclave hardware key generation (`kSecAccessControlBiometryCurrentSet`) to protect the Vault Master Key. |
+| **Air-Gapped P2P Wi-Fi Sync** | **Bonjour / mDNS + Ephemeral TLS 1.3** | Zero-cloud, local-network sync. 6-digit SAS PIN pairing derived from TLS `ExporterMasterSecret`; includes zero-install Android local PWA fallback. |
+| **Open Source Distribution** | **GitHub Releases `.dmg` + Homebrew Cask** | Automated GitHub Actions CI/CD on `macos-14` Apple Silicon runner; ad-hoc signed drag-and-drop `.dmg` installer. |
+
+---
+
+## 3. How to See & Test the UI in the Middle of Development
+
+You never have to wait until the end of the project to see the UI. At any point during development, you can inspect, interact with, and verify the user interface through several methods:
+
+### Method 1: Instant Static Prototype Preview
+Open the standalone interactive prototype directly in any web browser:
 ```bash
-codesign --force --deep --sign - "NeuralGalleryVault.app"
+open preview.html
 ```
-Tauri's macOS bundler handles ad-hoc signing automatically during local and CI/CD builds.
+* **Capabilities:** Light/Dark glassmorphic themes, 46 Microsoft 3D icons, collapsible video sub-categories, Places map pins, People & Pets face tracking carousel, candidate face confirmation banner, and responsive inspector sidebar.
 
-### 2.2. Gatekeeper Quarantine Mitigation
-When users download `NeuralGalleryVault.dmg` from GitHub Releases, macOS applies the `com.apple.quarantine` attribute. Neural Gallery will provide three clear onboarding paths:
+### Method 2: Live Local Web Review Server (Interactive)
+Launch the local Python-powered HTTP review server:
+```bash
+.venv/bin/neural-gallery serve --port 8765
+```
+* **URL:** Visit `http://127.0.0.1:8765/` in your browser.
+* **Capabilities:** Dynamically loads real photos and statistics from your SQLite database, renders thumbnail streams via `/media/{id}`, supports live favorite toggling, Finder revealing, duplicate trashing, and folder indexing.
+* *Classic View:* Access the minimalist 3-button review interface at `http://127.0.0.1:8765/legacy`.
 
-1. **GUI Onboarding (Right-Click Open):**  
-   Instruct users in the DMG background and README:
-   * Right-click (or `Control`-click) `NeuralGalleryVault.app` $\to$ Click **Open** $\to$ Confirm **Open**.
-2. **Terminal Quick-Command:**  
-   Provide a one-line terminal command in the GitHub release notes:
-   ```bash
-   xattr -cr /Applications/NeuralGalleryVault.app
-   ```
-3. **Community Homebrew Tap (Recommended):**  
-   Create a `homebrew-tap` repository (`brew install yourname/tap/neural-gallery-vault`). Homebrew automatically manages installation, updates, and quarantine exemptions.
+### Method 3: Native macOS Desktop App (Cocoa Webview)
+Launch the native borderless macOS application window:
+```bash
+.venv/bin/neural-gallery app
+```
+* **Capabilities:** Native window styling, draggable frosted glass header, system dark mode auto-detection, and native macOS folder picker dialogs.
 
-### 2.3. Native Capabilities Available Without a Developer Account
-* ✅ **Touch ID / Passcode:** `LocalAuthentication` framework (`LAContext.evaluatePolicy`) functions locally on any Mac without developer entitlement profiles.
-* ✅ **Apple Neural Engine (ANE):** Core ML and Apple Vision run at full hardware speed without licensing constraints.
-* ✅ **Local Keychain:** Hardware-backed keychain storage under `.userPresence` is available to ad-hoc signed binaries.
+### Method 4: Tauri 2.0 Live Development Server (Phases 4–6)
+Once Tauri 2.0 is scaffolded, run the continuous hot-reloading development server:
+```bash
+cargo tauri dev
+```
+* **Capabilities:** Native Apple Silicon binary with hot-reloading React 19 UI, instant IPC communication, and live Core ML / Vision bridge testing.
 
 ---
 
-## 3. System & Cryptographic Architecture
+## 4. Phase-by-Phase Roadmap & Progress Tracker
 
 ```
-User Master Password / Touch ID
-            │
-            ▼
-[macOS LocalAuthentication / Keychain]
-            │ (Releases Master Key into Secure Memory)
-            ▼
-    [Master Key (RAM with Zeroize)]
-      ├── SQLCipher Encryption Key ────────► [Encrypted Metadata DB]
-      └── File Streaming Cipher Key ───────► [Encrypted Media Blobs (.enc)]
-```
-
-### 3.1. Cryptographic Specifications
-* **Key Derivation Function (KDF):** Master key derived via **Argon2id** (memory: 64 MB, iterations: 3, parallelism: 4) using a unique system salt.
-* **Storage Encryption at Rest:**
-  * Raw images are never saved unencrypted to disk.
-  * Payloads are encrypted via **AES-256-GCM** using unique per-file 96-bit initialization vectors (IVs).
-  * Encrypted files are stored as `.enc` chunks in `~/Library/Application Support/NeuralGalleryVault/vault/`.
-* **Memory Hygiene:** Plaintext image buffers, decrypted thumbnails, and cipher keys implement `ZeroizeOnDrop` to prevent memory scraping attacks.
-
-### 3.2. Database Schema (SQLCipher + sqlite-vec)
-
-```sql
--- Encrypted Core Media Catalog
-CREATE TABLE media_assets (
-    id TEXT PRIMARY KEY,
-    filename TEXT NOT NULL,
-    storage_path TEXT NOT NULL,       -- Path to .enc file
-    file_size INTEGER NOT NULL,
-    mime_type TEXT NOT NULL,
-    width INTEGER,
-    height INTEGER,
-    captured_at DATETIME,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    latitude REAL,
-    longitude REAL,
-    altitude REAL,
-    city TEXT,
-    country TEXT,
-    aesthetic_score REAL,
-    is_favorite INTEGER DEFAULT 0
-);
-
--- Face Recognition Entities
-CREATE TABLE persons (
-    id TEXT PRIMARY KEY,
-    name TEXT,
-    cover_face_id TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE face_instances (
-    id TEXT PRIMARY KEY,
-    asset_id TEXT NOT NULL REFERENCES media_assets(id) ON DELETE CASCADE,
-    person_id TEXT REFERENCES persons(id) ON DELETE SET NULL,
-    box_x REAL,
-    box_y REAL,
-    box_width REAL,
-    box_height REAL,
-    embedding BLOB NOT NULL            -- 512-d float array (MobileFaceNet)
-);
-
--- Full-Text Search (OCR Text from Images)
-CREATE VIRTUAL TABLE asset_ocr USING fts5(
-    asset_id UNINDEXED,
-    recognized_text
-);
-
--- Natural Language Semantic Search Vector Table (sqlite-vec)
-CREATE VIRTUAL TABLE vec_embeddings USING vec0(
-    asset_id TEXT PRIMARY KEY,
-    embedding FLOAT[768]              -- 768-d MobileCLIP embedding
-);
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ [x] PHASE 1: Database Schema Modernization, EXIF Optics & Pet Recognition (PR #1)       │
+└───────────────────────────────────────────┬────────────────────────────────────────────┘
+                                            ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ [x] PHASE 2: Local REST API Endpoints, Real-Time UI Integration & Candidates (PR #2)   │
+└───────────────────────────────────────────┬────────────────────────────────────────────┘
+                                            ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ [ ] PHASE 3: Native Swift Acceleration Bridge (Apple Vision, Core ML ANE, Touch ID)    │
+└───────────────────────────────────────────┬────────────────────────────────────────────┘
+                                            ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ [ ] PHASE 4: Tauri 2.0 Core & Cryptographic EVFS Engine (Rust, Argon2id, SQLCipher)    │
+└───────────────────────────────────────────┬────────────────────────────────────────────┘
+                                            ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ [ ] PHASE 5: Air-Gapped P2P Wi-Fi Sync Engine (mDNS, TLS 1.3, SAS PIN, Android PWA)   │
+└───────────────────────────────────────────┬────────────────────────────────────────────┘
+                                            ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ [ ] PHASE 6: Frontend Migration to React 19 + TypeScript + Vite + TanStack Virtual     │
+└───────────────────────────────────────────┬────────────────────────────────────────────┘
+                                            ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ [ ] PHASE 7: GitHub CI/CD, DMG Packaging & Open-Source Homebrew Distribution           │
+└────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 4. Local AI Pipeline (Apple Neural Engine Acceleration)
-
-All AI inference executes locally using Apple Silicon hardware:
-
-```
-Incoming Decrypted Image Buffer
-               │
-      ┌────────┴──────────────────────────┐
-      ▼                                   ▼
-[Apple Vision Framework]         [Core ML Framework (ANE)]
- ├── VNDetectFaceRectanglesRequest ├── ArcFace / MobileFaceNet (512-d)
- │    └─ Face bounding boxes       │    └─ Face recognition clustering
- ├── VNRecognizeTextRequest        └── MobileCLIP (ViT-B/32, 768-d)
- │    └─ On-device OCR into FTS5        └─ Natural language semantic search
- └── VNCalculateImageAestheticsScoresRequest
-      └─ Sharpness / Quality curation
-```
-
-### 4.1. Natural Language Semantic Search
-1. During indexing, **MobileCLIP (ViT-B/32)** calculates a normalized 768-dimensional visual embedding on the Apple Neural Engine.
-2. When the user enters an arbitrary search query (e.g. *"golden retriever playing in snow"* or *"tax receipt from last year"*):
-   * Core ML translates the text prompt into a 768-dimensional text embedding.
-   * `sqlite-vec` executes a $K$-NN cosine distance query against `vec_embeddings`.
-   * Ranked results display in $< 15\text{ms}$ with zero manual tagging.
-
-### 4.2. Face Clustering Workflow
-1. Detect faces using `VNDetectFaceRectanglesRequest`.
-2. Extract face crops with 25% contextual padding.
-3. Generate 512-dimensional feature vectors via **MobileFaceNet** inside Core ML.
-4. Execute **DBSCAN** clustering:
-   $$\text{Cosine Similarity} = \frac{\mathbf{u} \cdot \mathbf{v}}{\|\mathbf{u}\|_2 \|\mathbf{v}\|_2} \ge 0.68$$
-   Matching vectors join existing person clusters; distinct faces spawn new clusters.
+### [x] Phase 1: Database Schema Modernization, EXIF Optics & Pet Recognition
+* **Status:** **COMPLETED** (Delivered in [PR #1](https://github.com/pratham1659/neural-gallery/pull/1))
+* **Deliverables:**
+  * Modernized SQLite database schema (`neural_gallery/db.py`) with EXIF optics, GPS coordinates, media flags (`is_favorite`, `is_video`, `is_screenshot`, `is_raw`, `is_portrait`, `is_live_photo`, `is_hidden`, `is_trashed`), and quality scoring metrics.
+  * Robust database migration engine (`migrate()`) with atomic column introspection and index generation.
+  * Full EXIF tag extraction and DMS GPS decimal parser in `neural_gallery/scan.py`.
+  * Integrated macOS Apple Vision `VNRecognizeAnimalsRequest` for dog and cat recognition in `neural_gallery/faces.py`.
+  * Added `toggle_favorite` and `set_category` library actions in `neural_gallery/actions.py`.
+  * 24 automated unit tests passing in `tests/test_phase1.py`.
 
 ---
 
-## 5. Peer-to-Peer Mobile Ingestion Engine (Wi-Fi Sync)
-
-```
-[ Mobile Companion App (iOS / Android) ]
-  │
-  ├── 1. Discovers Mac via Bonjour/mDNS (_photovault._tcp)
-  ├── 2. Connects to Mac Local IP via TLS
-  └── 3. Transmits 6-digit PIN handshake
-            │
-            ▼ (Local Wi-Fi Network)
-            │
-[ Mac Silicon Embedded Ingestion Daemon (Axum / Rust) ]
-  ├── 1. Validates pairing PIN
-  ├── 2. Parses EXIF & metadata in memory
-  ├── 3. Encrypts payload via AES-256-GCM
-  ├── 4. Writes .enc file to disk
-  └── 5. Dispatches background task to AI extraction queue
-```
-
-* **Zero Cloud Dependency:** Data never traverses third-party servers.
-* **Format Flexibility:** Streams high-resolution HEIC, JPEG, and 48MP Apple ProRAW files directly.
+### [x] Phase 2: Local REST API Endpoints, Real-Time UI Integration & Candidate Faces
+* **Status:** **COMPLETED** (Delivered in [PR #2](https://github.com/pratham1659/neural-gallery/pull/2))
+* **Deliverables:**
+  * Full JSON REST API in `neural_gallery/review.py`:
+    * `GET /api/photos`: Query by category (`all`, `favorites`, `recents`, `videos`, `screenshots`, `raw`, `panoramas`, `portraits`, `documents`, `duplicates`, `hidden`, `trash`), sort order, and pagination.
+    * `GET /api/photo?id=<id>`: Deep optical EXIF, GPS location, detected face chips, and OCR text.
+    * `POST /api/favorite`, `POST /api/hide`, `POST /api/trash`, `POST /api/category`: Dynamic metadata updates.
+    * `GET /api/map/pins`: Geocache locations formatted for the Places Map Explorer.
+    * `GET /api/people/candidates` & `POST /api/person/confirm`: Candidate face confirmation pipeline ("Confirm Candidate Faces" banner).
+    * `POST /api/person/merge`: Merge duplicate face clusters.
+    * `GET /api/sync/status` & `POST /api/sync/pair`: P2P Wi-Fi Sync mesh discovery and SAS PIN pairing.
+    * `GET /api/search`: Fast search across filenames, OCR text, camera models, and cities.
+    * `GET /`: Serves the modern HIG glassmorphic interface directly from `preview.html`.
+  * Real-time client synchronization in `preview.html`:
+    * Automatic live statistics updating sidebar category counters.
+    * Live photo cards rendered directly from local storage (`/media/{id}?w=480`).
+    * "Index Folder" header button supporting native Cocoa folder picker via `pywebview`.
+    * Live favorite toggling, Finder revealing, duplicate trashing, and candidate face confirmation.
+  * 12 new automated API tests in `tests/test_phase2.py` (36/36 tests passing across test suite).
 
 ---
 
-## 6. Dual-Mode User Interface Specifications
-
-### View Mode A: Google Photos Timeline Experience
-* **Pinch-to-Zoom Grid:** Seamless zooming between **Years $\leftrightarrow$ Months $\leftrightarrow$ Days** powered by `@tanstack/react-virtual` at 120Hz ProMotion refresh rates.
-* **Sticky Date Headers:** Human-readable timelines with reverse-geocoded spatial badges (e.g. *"September 18, 2026 • Cupertino, CA"* using an offline SQLite GeoNames database).
-* **Smart Albums:**
-  * **People & Pets:** Face-clustered avatar view with name editing.
-  * **Places:** Interactive offline map pins.
-  * **Categories:** Auto-curated collections (Receipts, Screenshots, Landscapes, Food).
-  * **Memories:** Automated "On This Day" cards.
-
-### View Mode B: File Manager & EXIF Inspector
-* **Tree View:** Traditional hierarchy displaying folders, storage structures, and manual tags.
-* **Raw Inspector:** Detailed slide-over panel displaying camera make, lens model, focal length, ISO, aperture, shutter speed, and exact GPS coordinates.
-* **Batch Operations:** Safe batch renaming and export tools.
+### [ ] Phase 3: Native Swift Acceleration Bridge (Apple Vision, Core ML ANE, Touch ID)
+* **Status:** **PENDING (Next Phase)**
+* **Scope & Tasks:**
+  * Create Swift module compiled into `libneural_vision.dylib` with C-callable exports:
+    * `neural_detect_faces`: Invokes `VNDetectFaceRectanglesRequest` (Revision 3) and `VNDetectFaceLandmarksRequest`.
+    * `neural_detect_animals`: Invokes `VNRecognizeAnimalsRequest` for pet classification.
+    * `neural_extract_ocr`: Invokes `VNRecognizeTextRequest` (`.accurate`) with multi-language tokenization.
+    * `neural_embed_image` & `neural_embed_text`: Dispatches MobileCLIP-B model directly to the Apple Neural Engine (ANE) via Core ML (`MLComputeUnits.all`), returning 768-d unit vectors.
+    * `neural_evaluate_touch_id`: Dispatches `LAContext.evaluatePolicy` to verify biometric ownership and wraps VMK with Secure Enclave key (`kSecAccessControlBiometryCurrentSet`).
+  * Implement incremental DBSCAN clustering over 512-d face vectors.
+* **UI Checkpoint:** CLI test runner and visual confirmation of ANE inference latency ($< 15\text{ms}$) and live face chips.
 
 ---
 
-## 7. Phased Implementation Roadmap
+### [ ] Phase 4: Tauri 2.0 Core & Cryptographic EVFS Engine
+* **Status:** **PENDING**
+* **Scope & Tasks:**
+  * Scaffold Tauri 2.0 workspace (`src-tauri`) with native Apple Silicon target.
+  * Cryptographic Key Hierarchy:
+    * Master Passphrase derivation via **Argon2id** ($m=64\text{ MiB}, t=3, p=4$) yielding 256-bit KEK.
+    * Secure memory allocation: Wrap keys and decrypted buffers in `zeroize::ZeroizeOnDrop` and pin pages using `libc::mlock`.
+  * Encrypted Virtual File System (EVFS):
+    * Streaming chunked encryptor/decryptor using **AES-256-GCM** (and XChaCha20-Poly1305 for large videos $>100\text{MB}$) into `.aev` blocks.
+    * Zero unencrypted bytes written to disk or swap space.
+  * Encrypted Database Engine:
+    * Statically link SQLCipher 4.6+ with WAL mode and memory PRAGMAs (`temp_store = MEMORY`).
+    * Link `sqlite-vec` extension for in-memory cosine similarity search over 768-d MobileCLIP embeddings.
+    * Link SQLite FTS5 for OCR token search.
+  * Panic Lockdown Trigger:
+    * Map `Cmd+L`, display sleep (`NSWorkspaceScreensDidSleepNotification`), and idle timer to wipe keys and drop to lock barrier in $< 10\text{ms}$.
+* **UI Checkpoint:** Desktop application window unlocks with master password / Touch ID and shows Argon2id progress animation.
 
-```mermaid
-flowchart TD
-    P1["Phase 1: Interactive UI Shell & Vault Foundation<br/>- Native macOS Arc-style window shell<br/>- Touch ID & Master Password unlock screen<br/>- Google Photos timeline & raw EXIF inspector mock<br/>- Rust cryptographic core (Argon2id, AES-256-GCM)"]
-    P2["Phase 2: Local AI & Apple Neural Engine<br/>- Swift/Core ML ANE bridge<br/>- MobileCLIP 768-d semantic search<br/>- sqlite-vec integration & Apple Vision OCR"]
-    P3["Phase 3: Decentralized Mobile Wi-Fi Sync<br/>- mDNS/Bonjour discovery daemon (_photovault._tcp)<br/>- Axum TLS server with 6-digit PIN handshake<br/>- P2P streaming protocol"]
-    P4["Phase 4: Full High-Performance Integration<br/>- Virtualized 120Hz infinite timeline (@tanstack/react-virtual)<br/>- Live SQLCipher and .enc blob decryption streaming<br/>- Smart Albums: People, Places, Memories"]
-    P5["Phase 5: GitHub CI/CD & Open-Source Release<br/>- Automated GitHub Actions macOS ARM64 build<br/>- Ad-hoc signed DMG packaging<br/>- Custom Homebrew Tap formula"]
+---
 
-    P1 --> P2
-    P2 --> P3
-    P3 --> P4
-    P4 --> P5
-```
+### [ ] Phase 5: Air-Gapped Peer-to-Peer Wi-Fi Ingestion Engine
+* **Status:** **PENDING**
+* **Scope & Tasks:**
+  * **Bonjour / mDNS Daemon:**
+    * Broadcast `_photovault._tcp.local.` using native network APIs.
+    * Advertise TXT records: `v=1`, `id=<vault_uuid>`, `fp=<cert_fingerprint>`, `auth=sas6`.
+  * **Ephemeral TLS 1.3 Socket Server:**
+    * Generate ephemeral in-memory self-signed X.509 certificate and private key valid for 24 hours.
+    * Enforce TLS 1.3 ciphers (`TLS_AES_256_GCM_SHA384` and `TLS_CHACHA20_POLY1305_SHA256`) via Rust `rustls`.
+    * Bind dynamically to an unassigned ephemeral port (`0.0.0.0:0`).
+  * **Out-of-Band SAS Pairing Protocol:**
+    * Extract TLS 1.3 `ExporterMasterSecret` and derive 6-digit numeric Short Authentication String (SAS).
+    * Display pairing PIN on the macOS desktop screen for mobile verification.
+  * **Multi-Platform Ingestion Streams:**
+    * Stream incoming media chunks directly into pinned `mlock` ring buffers in RAM.
+    * Parse EXIF, compute BLAKE3 digest, encrypt via AES-256-GCM, and commit to `.aev` block.
+    * Serve lightweight local PWA assets over the TLS socket for zero-install Android browser uploads via QR code.
+* **UI Checkpoint:** The P2P Wi-Fi Sync drawer in the left bottom corner displays active mDNS status, nearby devices, and interactive SAS PIN pairing modal.
 
-### Phase 1: Interactive UI Shell & Vault Foundation
-* **Scope:**
-  * **Interactive Visual UI & Design System:**
-    * Build the native macOS desktop shell with transparent titlebars and traffic light controls.
-    * Build the biometric **Touch ID & Master Password Unlock Screen** with smooth unlock animations.
-    * Implement the **Dual-Mode Experience Prototype**:
-      1. *Timeline View:* Year/Month/Day zooming, sticky date badges, semantic search bar, and photo cards with encrypted indicators.
-      2. *Finder Explorer View:* Folder tree, asset list, and slide-over **Raw EXIF & GPS Inspector**.
-  * **Cryptographic Foundation Core (Rust):**
-    * Scaffold Tauri v2 workspace with a modular Rust core.
-    * Implement AES-256-GCM chunked file streamer (`aes-gcm`, `zeroize`).
-    * Implement Argon2id password derivation and macOS Touch ID unlock (`security-framework` / `LocalAuthentication`).
-    * Integrate SQLCipher with initial `media_assets` and `tags` tables.
-* **Milestone:** An executable desktop application where you can experience the exact look, feel, and navigation of Neural Gallery Vault, unlock it with password/Touch ID, switch views, and inspect metadata.
+---
 
-### Phase 2: Local AI & Apple Neural Engine Integration
-* **Scope:**
-  * Build a lightweight Swift static bridge linking Apple Vision and Core ML.
-  * Deploy MobileCLIP (ViT-B/32) and MobileFaceNet compiled for the Apple Neural Engine.
-  * Integrate `sqlite-vec` into SQLCipher for vector search.
-  * Implement DBSCAN face clustering and OCR text indexing into FTS5.
-* **Milestone:** CLI capable of natural language queries (`neural-gallery query "sunset over water"`) and face groupings.
+### [ ] Phase 6: Frontend Migration to React 19 + TypeScript + Vite + TanStack Virtual
+* **Status:** **PENDING**
+* **Scope & Tasks:**
+  * Port the design system and components from `preview.html` into a modular React 19 + TypeScript + Vite project:
+    * `src/components/timeline/`: Multi-tier virtualized grid (Years $\leftrightarrow$ Months $\leftrightarrow$ Days) with TanStack Virtual.
+    * `src/components/explorer/`: Finder-grade multi-column table with deep EXIF/IPTC inspector sidebar (`⌘I`) and duplicate comparison.
+    * `src/components/map/`: Interactive Places & Geography map with geocache pins.
+    * `src/components/people/`: People & Pets face carousel with circular face chips and candidate confirmation banner.
+    * `src/components/auth/`: Touch ID and Master Password lock screen modal (`⌘L`).
+    * `src/components/sync/`: P2P Wi-Fi Sync modal and QR code generator for Android PWA pairing.
+  * Stream decrypted images to the WebKit canvas via memory-backed custom protocol (`aperture-stream://`) or ephemeral object URLs without disk staging.
+* **UI Checkpoint:** Full native desktop application executing at steady 60–120 fps ProMotion refresh rate with fluid pinch-to-zoom timeline transitions.
 
-### Phase 3: Decentralized Local Wi-Fi Sync Daemon
-* **Scope:**
-  * Implement Bonjour/mDNS service discovery (`_photovault._tcp.local.`).
-  * Build an Axum-based local HTTPS server with pairing PIN validation.
-  * Handle chunked multipart streaming of camera roll assets.
-* **Milestone:** Mobile devices can discover the Mac on local Wi-Fi and stream photos into the encrypted vault.
+---
 
-### Phase 4: Full High-Performance Integration
-* **Scope:**
-  * Connect the virtualized 120Hz React timeline directly to real encrypted `.enc` blobs and thumbnail caches.
-  * Implement offline reverse geocoding map pins for the Places album.
-  * Finalize the People & Pets cluster editor with face renaming.
-* **Milestone:** Seamless, production-ready desktop experience managing tens of thousands of encrypted photos.
+### [ ] Phase 7: GitHub CI/CD, Packaging & Open-Source Distribution
+* **Status:** **PENDING**
+* **Scope & Tasks:**
+  * **Automated GitHub Actions (`.github/workflows/release.yml`):**
+    * Triggered on version tag push (`git tag v1.0.0 && git push --tags`).
+    * Executes on Apple Silicon runner (`macos-14` M1).
+    * Compiles Swift bridge, builds Rust core with SQLCipher, bundles React 19 assets, and produces signed `.app` and `.dmg`.
+  * **Ad-Hoc Signing & Gatekeeper Documentation:**
+    * Configure ad-hoc code signing (`codesign --force --deep --sign -`).
+    * Include visual drag-and-drop `.dmg` background and clear quarantine bypass instructions (`xattr -cr`).
+  * **Community Homebrew Cask:**
+    * Create Homebrew formula for one-command installation:
+      ```bash
+      brew install --cask neural-gallery
+      ```
+* **UI Checkpoint:** Downloadable, drag-and-drop `.dmg` available on GitHub Releases that opens seamlessly on any Apple Silicon Mac.
 
-### Phase 5: CI/CD & Zero-Cost GitHub Distribution
-* **Scope:**
-  * Set up GitHub Actions workflow on `macos-14` (Apple Silicon runners).
-  * Automate DMG creation with custom background and ad-hoc code signing.
-  * Write clear user instructions for Gatekeeper bypass (`xattr -cr`).
-  * Launch a community Homebrew tap repository (`homebrew-tap`).
-* **Milestone:** Public GitHub release with automated DMG downloads and one-line Homebrew installation.
+---
+
+## 5. Security & Contribution Guidelines
+
+1. **Strict PR Workflow:** Never push directly to `main`. Every phase must be developed on a dedicated feature branch (e.g. `feat/phase-X-description`), verified with tests, and merged via GitHub Pull Request (`gh pr create`).
+2. **README Synchronization:** Keep [`README.md`](README.md) continuously updated with all new commands, features, and API endpoints as each phase completes.
+3. **No Unencrypted Disk Swaps:** Decrypted frame buffers, cryptographic keys, and thumbnails must never be written to `/tmp` or standard cache directories.
+4. **Zero Cloud Egress:** All network activity is restricted to local subnet peer-to-peer sync (`_photovault._tcp.local.`). Zero analytics, zero cloud relays, and zero telemetry.

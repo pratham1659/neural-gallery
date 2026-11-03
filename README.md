@@ -123,6 +123,7 @@ Neural Gallery serves a local, air-gapped JSON REST API that powers both the bro
 
 Full architectural specifications and guidelines are available in the [`docs/`](docs/INDEX.md) directory:
 
+- [Master Architecture & Implementation Plan](plan.md)
 - [System Architecture](docs/ARCHITECTURE.md) & [Architecture Overview](ARCHITECTURE.md)
 - [Database Schema & Data Models](docs/DATABASE_SCHEMA.md) & [Backend Schema Spec](docs/specs/05_SCHEMA.md)
 - [HTTP REST API & Desktop Bridge](docs/API_REFERENCE.md)
