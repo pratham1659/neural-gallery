@@ -72,6 +72,9 @@ def main(argv: list[str] | None = None) -> int:
     app = commands.add_parser("app", help="Open the Neural Gallery desktop window.")
     app.add_argument("--port", type=int, default=8765)
 
+    sync_cmd = commands.add_parser("sync", help="Start local air-gapped P2P Wi-Fi sync server.")
+    sync_cmd.add_argument("--port", type=int, default=8765)
+
     commands.add_parser("faces", help="Find faces on this Mac and group similar ones.")
 
     args = parser.parse_args(argv)
@@ -96,6 +99,23 @@ def main(argv: list[str] | None = None) -> int:
             from neural_gallery.desktop import open_window
 
             open_window(db_path, args.port)
+            return 0
+        if args.command == "sync":
+            from neural_gallery.sync import get_sync_engine
+
+            engine = get_sync_engine()
+            print("==================================================")
+            print("  NEURAL GALLERY — P2P WI-FI MESH SYNC SERVER")
+            print("==================================================")
+            print(f"Service:      _photovault._tcp.local.")
+            print(f"Vault UUID:   {engine.vault_id}")
+            print(f"SAS PIN:      {engine.sas_pin}")
+            print(f"PWA Sync URL: http://0.0.0.0:{args.port}/sync")
+            print("--------------------------------------------------")
+            print("To sync from iPhone/Android: open the URL on your")
+            print("phone, then enter the 6-digit SAS pairing PIN.")
+            print("==================================================")
+            serve(db_path, args.port)
             return 0
         if args.command == "faces":
             summary = scan_faces(db_path)

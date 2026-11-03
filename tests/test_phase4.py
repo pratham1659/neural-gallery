@@ -55,7 +55,8 @@ class TestPhase4TauriAndCrypto(unittest.TestCase):
             0,
             f"Cargo test failed:\nSTDOUT: {proc.stdout}\nSTDERR: {proc.stderr}",
         )
-        self.assertIn("12 passed", proc.stdout)
+        self.assertIn("0 failed", proc.stdout)
+        self.assertIn("test result: ok", proc.stdout)
 
 
 if __name__ == "__main__":

@@ -94,6 +94,7 @@ neural-gallery serve
 | `scan <folder>` | Index photos, RAW files, and videos under the folder with EXIF and GPS extraction. |
 | `stats` | Display counts for total media, favorites, videos, RAW, portraits, screenshots, geocoded items, duplicates, faces, and pets. |
 | `faces` | Run on-device Apple Vision framework face & pet detection and feature print grouping. |
+| `sync` | Start the local air-gapped P2P Wi-Fi sync server for iOS & Android wireless ingestion. |
 | `app` | Launch the borderless native macOS desktop window. |
 | `serve` | Run the local review web interface at `http://127.0.0.1:8765`. |
 
@@ -119,6 +120,10 @@ Neural Gallery serves a local, air-gapped JSON REST API that powers both the bro
 | `/api/person/merge` | `POST` | Merge two person groups (`{"source": str, "target": str}`). |
 | `/api/sync/status` | `GET` | P2P local Wi-Fi sync mesh status, paired devices, and SAS PIN pairing state. |
 | `/api/sync/pair` | `POST` | Validate 6-digit SAS pairing PIN (`{"pin": str}`). |
+| `/api/sync/unpair` | `POST` | Remove or unpair a connected device (`{"device_id": str}`). |
+| `/api/sync/rotate-pin` | `POST` | Derive a fresh 6-digit SAS PIN. |
+| `/api/sync/upload` | `POST` | Ingest wireless photo/video uploads from mobile PWA over local Wi-Fi. |
+| `/sync` | `GET` | Zero-install local PWA web app for wireless iOS & Android camera roll uploads. |
 | `/api/search` | `GET` | Search across OCR text, camera models, locations, and filenames. |
 | `/media/<id>?w=<pixels>` | `GET` | On-the-fly thumbnail and preview delivery directly from local storage. |
 | `/` | `GET` | Modern interactive glassmorphic gallery UI. |

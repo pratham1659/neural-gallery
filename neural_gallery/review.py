@@ -1,6 +1,8 @@
 """Localhost review page. It can label photos. It cannot delete them."""
 
 import json
+import time
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import BytesIO
 from pathlib import Path
@@ -31,6 +33,7 @@ from neural_gallery.faces import (
 )
 from neural_gallery.learn import load_examples, suggest
 from neural_gallery.scan import scan_folder
+from neural_gallery.sync import MOBILE_PWA_HTML, get_sync_engine
 
 PAGE = """<!DOCTYPE html>
 <html lang="en">
@@ -1051,29 +1054,7 @@ def map_pins(connection) -> list[dict]:
 
 
 def sync_status() -> dict:
-    return {
-        "status": "ready",
-        "service_name": "_photovault._tcp.local.",
-        "devices": [
-            {
-                "id": "dev-iphone-16",
-                "name": "Pratham's iPhone 16 Pro",
-                "model": "iPhone17,1",
-                "state": "paired",
-                "last_sync": "Just now",
-            },
-            {
-                "id": "dev-pixel-9",
-                "name": "Pixel 9 Pro XL",
-                "model": "Pixel 9 Pro",
-                "state": "nearby",
-                "last_sync": "Yesterday",
-            },
-        ],
-        "sas_pin": "849 201",
-        "tls_version": "TLS 1.3",
-        "mesh_active": True,
-    }
+    return get_sync_engine().get_status()
 
 
 def make_handler(db_path: Path):
@@ -1101,6 +1082,9 @@ def make_handler(db_path: Path):
                     self._send(200, preview_path.read_bytes(), "text/html; charset=utf-8")
                     return
                 self._send(200, PAGE.encode(), "text/html; charset=utf-8")
+                return
+            if parsed.path in ("/sync", "/sync/", "/sync.html"):
+                self._send(200, MOBILE_PWA_HTML.encode(), "text/html; charset=utf-8")
                 return
             if parsed.path == "/legacy":
                 self._send(200, PAGE.encode(), "text/html; charset=utf-8")
@@ -1296,7 +1280,9 @@ def make_handler(db_path: Path):
             self._send(404, b"", "text/plain")
 
         def _payload(self):
-            if self.headers.get("X-Neural-Gallery") != "1":
+            parsed = urlparse(self.path)
+            is_sync = parsed.path.startswith("/api/sync/")
+            if not is_sync and self.headers.get("X-Neural-Gallery") != "1":
                 self._json(400, {"error": "missing X-Neural-Gallery header"})
                 return None
             length = int(self.headers.get("Content-Length") or "0")
@@ -1311,6 +1297,36 @@ def make_handler(db_path: Path):
 
         def do_POST(self) -> None:
             parsed = urlparse(self.path)
+            if parsed.path == "/api/sync/upload":
+                content_len = int(self.headers.get("Content-Length", 0))
+                if content_len == 0:
+                    self._json(400, {"error": "empty upload"})
+                    return
+                body = self.rfile.read(content_len)
+                ctype = self.headers.get("Content-Type", "")
+                filename = self.headers.get("X-Filename") or f"sync_photo_{int(time.time())}.jpg"
+                file_bytes = body
+                if "multipart/form-data" in ctype and "boundary=" in ctype:
+                    boundary = ctype.split("boundary=")[1].strip()
+                    parts = body.split(b"--" + boundary.encode())
+                    for part in parts:
+                        if b"Content-Disposition" in part and b"filename=" in part:
+                            hdr_end = part.find(b"\r\n\r\n")
+                            if hdr_end != -1:
+                                headers_part = part[:hdr_end].decode("utf-8", errors="ignore")
+                                for line in headers_part.split("\r\n"):
+                                    if "filename=" in line:
+                                        raw_fn = line.split("filename=")[1].strip('"\'; ')
+                                        if raw_fn:
+                                            filename = raw_fn
+                                file_bytes = part[hdr_end + 4:].rstrip(b"\r\n--")
+                                break
+
+                incoming_folder = Path.home() / "Pictures" / "Neural Gallery Imports"
+                res = get_sync_engine().ingest_bytes(filename, file_bytes, incoming_folder, db_path)
+                self._json(200, res)
+                return
+
             if parsed.path == "/api/scan":
                 payload = self._payload()
                 if payload is None:
@@ -1340,6 +1356,8 @@ def make_handler(db_path: Path):
                 "/api/person/confirm",
                 "/api/person/merge",
                 "/api/sync/pair",
+                "/api/sync/unpair",
+                "/api/sync/rotate-pin",
             }
             if parsed.path not in valid_post_paths:
                 self._send(404, b"", "text/plain")
@@ -1468,7 +1486,28 @@ def make_handler(db_path: Path):
                     if not isinstance(pin, str) or not pin.strip():
                         self._json(400, {"error": "6-digit pairing PIN is required"})
                         return
-                    self._json(200, {"success": True, "pin": pin.strip(), "paired": True})
+                    name = payload.get("name") or "Mobile Device"
+                    model = payload.get("model") or "Phone"
+                    device_id = payload.get("device_id") or f"dev-{uuid.uuid4().hex[:8]}"
+                    res = get_sync_engine().pair_device(device_id, pin.strip(), name, model)
+                    if res.get("success"):
+                        self._json(200, res)
+                    else:
+                        self._json(401, res)
+                    return
+
+                if parsed.path == "/api/sync/unpair":
+                    device_id = payload.get("device_id")
+                    if not isinstance(device_id, str):
+                        self._json(400, {"error": "device_id is required"})
+                        return
+                    res = get_sync_engine().unpair_device(device_id)
+                    self._json(200, {"success": res, "device_id": device_id})
+                    return
+
+                if parsed.path == "/api/sync/rotate-pin":
+                    new_pin = get_sync_engine().generate_new_sas_pin()
+                    self._json(200, {"success": True, "sas_pin": new_pin})
                     return
 
                 file_id = payload.get("id")
