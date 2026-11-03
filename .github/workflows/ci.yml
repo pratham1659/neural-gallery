@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test Suite (Apple Silicon)
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python Dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install -e .
+          pip install -r requirements.txt
+
+      - name: Set up Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install Frontend Dependencies
+        run: npm ci || npm install
+
+      - name: Compile Native Swift Acceleration Bridge
+        run: |
+          chmod +x ./native/build.sh
+          ./native/build.sh
+
+      - name: Run Rust Unit Tests (Tauri Core & Cryptography)
+        run: |
+          cd src-tauri
+          cargo test --verbose
+
+      - name: Build React 19 Production Frontend
+        run: npm run build
+
+      - name: Run Python Automated Test Suite
+        run: |
+          source .venv/bin/activate
+          python -m unittest discover -s tests

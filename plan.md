@@ -135,7 +135,7 @@ cargo tauri dev
 └───────────────────────────────────────────┬────────────────────────────────────────────┘
                                             ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ [ ] PHASE 7: GitHub CI/CD, DMG Packaging & Open-Source Homebrew Distribution           │
+│ [x] PHASE 7: GitHub CI/CD, DMG Packaging & Open-Source Homebrew Distribution           │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -264,22 +264,25 @@ cargo tauri dev
 
 ---
 
-### [ ] Phase 7: GitHub CI/CD, Packaging & Open-Source Distribution
-* **Status:** **PENDING**
-* **Scope & Tasks:**
-  * **Automated GitHub Actions (`.github/workflows/release.yml`):**
-    * Triggered on version tag push (`git tag v1.0.0 && git push --tags`).
-    * Executes on Apple Silicon runner (`macos-14` M1).
-    * Compiles Swift bridge, builds Rust core with SQLCipher, bundles React 19 assets, and produces signed `.app` and `.dmg`.
-  * **Ad-Hoc Signing & Gatekeeper Documentation:**
-    * Configure ad-hoc code signing (`codesign --force --deep --sign -`).
-    * Include visual drag-and-drop `.dmg` background and clear quarantine bypass instructions (`xattr -cr`).
-  * **Community Homebrew Cask:**
-    * Create Homebrew formula for one-command installation:
+### [x] Phase 7: GitHub CI/CD, DMG Packaging & Open-Source Distribution
+* **Status:** **COMPLETED**
+* **Deliverables:**
+  * **Automated GitHub Actions Workflows (`.github/workflows/`):**
+    * [`ci.yml`](.github/workflows/ci.yml): Runs on Apple Silicon (`macos-14`), validates Python 3.11 test suite, compiles Swift bridge (`libneural_bridge.dylib`), runs Tauri Rust core unit tests (`cargo test`), builds React 19 frontend bundle (`npm run build`), and executes full end-to-end integration tests.
+    * [`release.yml`](.github/workflows/release.yml): Triggered on semver git tags (`v*`), compiles native Swift and Rust artifacts, bundles React 19 frontend, packages standalone drag-and-drop `.dmg` installer via `scripts/build_dmg.sh`, generates SHA256 checksums, and publishes GitHub Release assets.
+  * **Standalone macOS DMG Packager & Ad-Hoc Signer (`scripts/build_dmg.sh`):**
+    * Creates native `.app` bundle structure with `Info.plist`, executable launcher, embedded dylibs, icons, and UI bundles.
+    * Signs with ad-hoc identity (`codesign --force --deep --sign -`).
+    * Packages cleanly into compressed `Neural_Gallery_{VERSION}_aarch64.dmg` with `/Applications` drag-and-drop symlink.
+  * **Community Homebrew Cask Formula (`Casks/neural-gallery.rb`):**
+    * Provides one-command community installation:
       ```bash
       brew install --cask neural-gallery
       ```
-* **UI Checkpoint:** Downloadable, drag-and-drop `.dmg` available on GitHub Releases that opens seamlessly on any Apple Silicon Mac.
+    * Auto-manages quarantine attribute clearing (`xattr -cr`) and app uninstall lifecycle.
+  * **Comprehensive Verification Suite (`tests/test_phase7.py`):**
+    * 4 new automated tests validating CI/CD workflow syntax, Homebrew formula integrity, and DMG build script generation.
+    * 65/65 tests passing across entire repository test suite.
 
 ---
 

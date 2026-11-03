@@ -11,6 +11,8 @@ build/
 # Rust & Tauri
 target/
 src-tauri/target/
+dist-dmg/
+release-artifacts/
 
 # Node & Frontend
 node_modules/
