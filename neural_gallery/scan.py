@@ -380,6 +380,23 @@ def scan_folder(folder: Path, db_path: Path) -> dict:
             if seen % 200 == 0:
                 connection.commit()
                 print(f"scanned {seen}", flush=True)
+
+            if record.get("is_document") or record.get("is_screenshot"):
+                try:
+                    from neural_gallery.native_bridge import is_native_available, extract_ocr
+
+                    if is_native_available():
+                        file_row = connection.execute("SELECT id FROM files WHERE path = ?", (record["path"],)).fetchone()
+                        if file_row:
+                            ocr_text = extract_ocr(path.read_bytes())
+                            if ocr_text:
+                                connection.execute(
+                                    "INSERT OR REPLACE INTO asset_ocr(file_id, text, confidence) VALUES (?, ?, 1.0)",
+                                    (file_row["id"], ocr_text),
+                                )
+                except Exception:
+                    pass
+
         groups = rebuild_groups(connection)
         connection.commit()
         return {

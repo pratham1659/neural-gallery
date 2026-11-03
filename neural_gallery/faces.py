@@ -63,7 +63,18 @@ def _feature_print(image: Image.Image) -> np.ndarray | None:
 
 
 def _detect_boxes(path: Path) -> list[tuple[float, float, float, float]]:
-    """Detect human faces using Apple Vision VNDetectFaceRectanglesRequest."""
+    """Detect human faces using Apple Vision (via native Swift bridge or PyObjC)."""
+    try:
+        from neural_gallery.native_bridge import is_native_available, detect_faces
+
+        if is_native_available():
+            data = path.read_bytes()
+            faces = detect_faces(data)
+            if faces:
+                return [(f["x"], f["y"], f["w"], f["h"]) for f in faces]
+    except Exception:
+        pass
+
     try:
         import Vision
         from Foundation import NSURL
@@ -84,7 +95,21 @@ def _detect_boxes(path: Path) -> list[tuple[float, float, float, float]]:
 
 
 def _detect_animals(path: Path) -> list[tuple[float, float, float, float, str, float]]:
-    """Detect pets (dogs, cats) using Apple Vision VNRecognizeAnimalsRequest."""
+    """Detect pets (dogs, cats) using Apple Vision (via native Swift bridge or PyObjC)."""
+    try:
+        from neural_gallery.native_bridge import is_native_available, detect_animals
+
+        if is_native_available():
+            data = path.read_bytes()
+            animals = detect_animals(data)
+            if animals:
+                return [
+                    (a["x"], a["y"], a["w"], a["h"], a.get("label", "pet"), a.get("confidence", 0.95))
+                    for a in animals
+                ]
+    except Exception:
+        pass
+
     try:
         import Vision
         from Foundation import NSURL
