@@ -331,6 +331,18 @@
         linear-gradient(90deg, var(--map-road) 1px, transparent 1px);
       background-size: 100% 100%, 36px 36px, 36px 36px;
     }
+
+    /* Face Bounding Box Focus Animation */
+    .face-box-overlay {
+      border: 2px solid #10b981;
+      background: rgba(16, 185, 129, 0.15);
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+      transition: all 0.2s ease;
+    }
+    .face-box-overlay:hover {
+      border-color: #3b82f6;
+      background: rgba(59, 130, 246, 0.25);
+    }
   </style>
 </head>
 <body class="p-3 md:p-6 lg:p-8 min-h-screen flex items-center justify-center">
@@ -368,6 +380,8 @@
 
     <!-- ========================================================================
          TOP WINDOW CHROME / HEADER
+         Clean Apple-style header: Traffic lights, app title, mode switch, and theme/lock controls
+         (P2P Wi-Fi Sync moved to left bottom corner above trash; ANE removed from top right)
          ======================================================================== -->
     <header class="glass-header h-12 flex items-center justify-between px-4 select-none shrink-0 z-30">
       
@@ -389,7 +403,7 @@
         </div>
       </div>
 
-      <!-- Mode Switcher (Timeline, Explorer, Places Map) -->
+      <!-- Mode Switcher (Timeline ⌘1, Explorer ⌘2, Places Map ⌘3, People & Pets ⌘4) -->
       <div id="topModeSwitch" class="flex items-center p-0.5 rounded-lg border shadow-xs" style="background: var(--pill-bg); border-color: var(--pill-border);">
         <button id="btnTimelineMode" onclick="switchView('timeline')" class="mode-switch-btn active px-3 py-1 rounded-md text-xs transition-all flex items-center gap-1.5 cursor-pointer">
           <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Framed%20picture/3D/framed_picture_3d.png" class="w-3.5 h-3.5 object-contain" alt="Timeline">
@@ -398,31 +412,23 @@
         </button>
         <button id="btnExplorerMode" onclick="switchView('explorer')" class="mode-switch-btn inactive px-3 py-1 rounded-md text-xs transition-all flex items-center gap-1.5 cursor-pointer">
           <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Compass/3D/compass_3d.png" class="w-3.5 h-3.5 object-contain" alt="Explorer">
-          <span>Explorer & Triage</span>
+          <span>Explorer</span>
           <span class="text-[9px] opacity-70 font-mono">⌘2</span>
         </button>
         <button id="btnPlacesMode" onclick="switchView('places')" class="mode-switch-btn inactive px-3 py-1 rounded-md text-xs transition-all flex items-center gap-1.5 cursor-pointer">
           <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/World%20map/3D/world_map_3d.png" class="w-3.5 h-3.5 object-contain" alt="Places Map">
-          <span>Places & Geography</span>
+          <span>Places</span>
           <span class="text-[9px] opacity-70 font-mono">⌘3</span>
+        </button>
+        <button id="btnPeopleMode" onclick="switchView('people')" class="mode-switch-btn inactive px-3 py-1 rounded-md text-xs transition-all flex items-center gap-1.5 cursor-pointer">
+          <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Busts%20in%20silhouette/3D/busts_in_silhouette_3d.png" class="w-3.5 h-3.5 object-contain" alt="People & Pets">
+          <span>People & Faces</span>
+          <span class="text-[9px] opacity-70 font-mono">⌘4</span>
         </button>
       </div>
 
-      <!-- Right Header Actions (Sync, ANE, Theme, Lock) -->
+      <!-- Right Header Actions (Cleaned: Theme Switcher & Lock Vault Button) -->
       <div class="flex items-center gap-2">
-        <!-- P2P Wi-Fi Sync Indicator -->
-        <div class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono border" style="background: var(--badge-neutral-bg); border-color: var(--badge-neutral-border); color: var(--text-secondary);" title="P2P Local Wi-Fi Mesh (_photovault._tcp.local) - Zero Cloud Egress">
-          <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Antenna%20bars/3D/antenna_bars_3d.png" class="w-3.5 h-3.5 object-contain" alt="P2P Sync">
-          <span>P2P Sync</span>
-          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-        </div>
-
-        <!-- ANE Acceleration Badge -->
-        <div class="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono border" style="background: var(--badge-neutral-bg); border-color: var(--badge-neutral-border); color: var(--text-secondary);">
-          <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Sparkles/3D/sparkles_3d.png" class="w-3.5 h-3.5 object-contain" alt="ANE Ready">
-          <span>ANE: 2.1ms</span>
-        </div>
-
         <!-- Light/Dark Mode Switcher -->
         <button onclick="toggleTheme()" class="p-1.5 rounded-lg border transition-all cursor-pointer" style="background: var(--btn-ghost-bg); border-color: var(--btn-ghost-border);" title="Toggle Obsidian Dark / Apple Light Theme">
           <img id="themeIcon" src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Crescent%20moon/3D/crescent_moon_3d.png" class="w-4 h-4 object-contain" alt="Theme">
@@ -443,7 +449,7 @@
     <div class="flex-1 flex overflow-hidden">
       
       <!-- ======================================================================
-           SIDEBAR WITH SEMI-SUBCATEGORIES (APPLE PHOTOS & GOOGLE PHOTOS ALIGNED)
+           SIDEBAR WITH SEMI-SUBCATEGORIES & LEFT BOTTOM WI-FI SYNC ABOVE TRASH
            ====================================================================== -->
       <aside id="appSidebar" class="w-64 glass-sidebar flex flex-col justify-between p-3 select-none overflow-y-auto custom-scroll shrink-0">
         <div class="space-y-4">
@@ -453,7 +459,7 @@
             <p class="text-[10px] font-semibold uppercase tracking-wider px-2 mb-1.5 font-mono" style="color: var(--text-muted);">Library</p>
             <nav class="space-y-0.5 text-xs font-medium">
               <!-- All Photos -->
-              <button onclick="selectCategory('all', this)" class="category-btn active-category w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+              <button onclick="selectCategory('all', this); switchView('timeline')" class="category-btn active-category w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer">
                 <span class="flex items-center gap-2.5">
                   <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Framed%20picture/3D/framed_picture_3d.png" class="w-4 h-4 object-contain" alt="All Photos">
                   <span>All Photos</span>
@@ -462,7 +468,7 @@
               </button>
 
               <!-- Favorites -->
-              <button onclick="selectCategory('favorites', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+              <button onclick="selectCategory('favorites', this); switchView('timeline')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer">
                 <span class="flex items-center gap-2.5">
                   <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Red%20heart/3D/red_heart_3d.png" class="w-4 h-4 object-contain" alt="Favorites">
                   <span>Favorites</span>
@@ -471,7 +477,7 @@
               </button>
 
               <!-- Recents -->
-              <button onclick="selectCategory('recents', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+              <button onclick="selectCategory('recents', this); switchView('timeline')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer">
                 <span class="flex items-center gap-2.5">
                   <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Stopwatch/3D/stopwatch_3d.png" class="w-4 h-4 object-contain" alt="Recents">
                   <span>Recents</span>
@@ -485,11 +491,11 @@
           <div>
             <div class="flex items-center justify-between px-2 mb-1.5">
               <p class="text-[10px] font-semibold uppercase tracking-wider font-mono" style="color: var(--text-muted);">Sharing</p>
-              <span class="text-[9px] font-mono text-emerald-600 font-bold">P2P Active</span>
+              <span class="text-[9px] font-mono text-emerald-600 font-bold">P2P Mesh</span>
             </div>
             <nav class="space-y-0.5 text-xs font-medium">
               <!-- Shared Albums -->
-              <button onclick="selectCategory('shared-albums', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+              <button onclick="selectCategory('shared-albums', this); switchView('timeline')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer">
                 <span class="flex items-center gap-2.5">
                   <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/File%20folder/3D/file_folder_3d.png" class="w-4 h-4 object-contain" alt="Shared Albums">
                   <span>Shared Albums</span>
@@ -498,7 +504,7 @@
               </button>
 
               <!-- Shared with You -->
-              <button onclick="selectCategory('shared-with-you', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+              <button onclick="selectCategory('shared-with-you', this); switchView('timeline')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer">
                 <span class="flex items-center gap-2.5">
                   <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Globe%20with%20meridians/3D/globe_with_meridians_3d.png" class="w-4 h-4 object-contain" alt="Shared with You">
                   <span>Shared with You</span>
@@ -507,40 +513,31 @@
               </button>
 
               <!-- Partner Sharing (Android Google Photos feature) -->
-              <button onclick="selectCategory('partner-sharing', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+              <button onclick="selectCategory('partner-sharing', this); switchView('timeline')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer">
                 <span class="flex items-center gap-2.5">
                   <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Handshake/3D/handshake_3d.png" class="w-4 h-4 object-contain" alt="Partner Sharing">
                   <span>Partner Sharing</span>
                 </span>
                 <span class="text-[10px] font-mono text-emerald-600">Maya</span>
               </button>
-
-              <!-- P2P Local Mesh Direct Sync -->
-              <button onclick="selectCategory('p2p-mesh', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
-                <span class="flex items-center gap-2.5">
-                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Antenna%20bars/3D/antenna_bars_3d.png" class="w-4 h-4 object-contain" alt="P2P Mesh">
-                  <span>P2P Direct Mesh</span>
-                </span>
-                <span class="text-[9px] font-mono text-indigo-500">Zero Cloud</span>
-              </button>
             </nav>
           </div>
 
-          <!-- Group 3: People, Pets & Travel -->
+          <!-- Group 3: People, Pets & Travel (User Requested: Track People & Collect Faces) -->
           <div>
             <p class="text-[10px] font-semibold uppercase tracking-wider px-2 mb-1.5 font-mono" style="color: var(--text-muted);">People, Pets & Travel</p>
             <nav class="space-y-0.5 text-xs font-medium">
-              <!-- People -->
-              <button onclick="selectCategory('people', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+              <!-- People & Face Tracking (Clicking switches to People & Faces View) -->
+              <button onclick="selectCategory('people', this); switchView('people')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer">
                 <span class="flex items-center gap-2.5">
                   <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Busts%20in%20silhouette/3D/busts_in_silhouette_3d.png" class="w-4 h-4 object-contain" alt="People">
-                  <span>People</span>
+                  <span class="font-semibold">People & Faces</span>
                 </span>
-                <span class="text-[11px] font-mono text-purple-600 font-bold">23 people</span>
+                <span class="text-[11px] font-mono text-purple-600 font-bold">23 tracked</span>
               </button>
 
-              <!-- Pets & Animals (User Requested Category) -->
-              <button onclick="selectCategory('pets', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+              <!-- Pets & Animals -->
+              <button onclick="selectCategory('pets', this); switchView('people')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer">
                 <span class="flex items-center gap-2.5">
                   <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Paw%20prints/3D/paw_prints_3d.png" class="w-4 h-4 object-contain" alt="Pets & Animals">
                   <span>Pets & Animals</span>
@@ -548,8 +545,8 @@
                 <span class="text-[11px] font-mono text-amber-600 font-bold">4 pets</span>
               </button>
 
-              <!-- Travel & Trips (User Requested Category) -->
-              <button onclick="selectCategory('travel', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+              <!-- Travel & Trips -->
+              <button onclick="selectCategory('travel', this); switchView('timeline')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer">
                 <span class="flex items-center gap-2.5">
                   <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Airplane/3D/airplane_3d.png" class="w-4 h-4 object-contain" alt="Travel & Trips">
                   <span>Travel & Trips</span>
@@ -557,8 +554,8 @@
                 <span class="text-[11px] font-mono text-sky-600 font-bold">8 trips</span>
               </button>
 
-              <!-- Places Map & Geography Location (User Requested) -->
-              <button onclick="selectCategory('places', this); switchView('places')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+              <!-- Places Map & Geography Location -->
+              <button onclick="selectCategory('places', this); switchView('places')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer">
                 <span class="flex items-center gap-2.5">
                   <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/World%20map/3D/world_map_3d.png" class="w-4 h-4 object-contain" alt="Places Map">
                   <span>Places Map</span>
@@ -581,7 +578,7 @@
               
               <!-- Parent Videos Semi-Subcategory with Collapse -->
               <div>
-                <div class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg category-btn cursor-pointer" onclick="toggleCollapse('videosSubTree', 'chevronVideos'); selectCategory('videos', this)">
+                <div class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg category-btn cursor-pointer" onclick="toggleCollapse('videosSubTree', 'chevronVideos'); selectCategory('videos', this); switchView('timeline')">
                   <span class="flex items-center gap-2">
                     <svg id="chevronVideos" class="w-3 h-3 chevron-arrow rotated" style="color: var(--text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
@@ -594,7 +591,7 @@
 
                 <!-- Nested Sub-items under Videos -->
                 <div id="videosSubTree" class="sub-tree space-y-0.5 my-0.5">
-                  <button onclick="selectCategory('videos', this)" class="category-btn w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px]">
+                  <button onclick="selectCategory('videos', this); switchView('timeline')" class="category-btn w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px] cursor-pointer">
                     <span class="flex items-center gap-2">
                       <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Clapper%20board/3D/clapper_board_3d.png" class="w-3.5 h-3.5 object-contain" alt="ProRes">
                       <span>Cinematic & 4K ProRes</span>
@@ -602,7 +599,7 @@
                     <span class="font-mono text-[10px]" style="color: var(--text-muted);">28</span>
                   </button>
                   
-                  <button onclick="selectCategory('slomo', this)" class="category-btn w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px]">
+                  <button onclick="selectCategory('slomo', this); switchView('timeline')" class="category-btn w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px] cursor-pointer">
                     <span class="flex items-center gap-2">
                       <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Snail/3D/snail_3d.png" class="w-3.5 h-3.5 object-contain" alt="Slo-mo">
                       <span>Slo-mo</span>
@@ -610,7 +607,7 @@
                     <span class="font-mono text-[10px]" style="color: var(--text-muted);">12</span>
                   </button>
 
-                  <button onclick="selectCategory('timelapse', this)" class="category-btn w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px]">
+                  <button onclick="selectCategory('timelapse', this); switchView('timeline')" class="category-btn w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px] cursor-pointer">
                     <span class="flex items-center gap-2">
                       <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Hourglass%20done/3D/hourglass_done_3d.png" class="w-3.5 h-3.5 object-contain" alt="Time-lapse">
                       <span>Time-lapse</span>
@@ -618,7 +615,7 @@
                     <span class="font-mono text-[10px]" style="color: var(--text-muted);">9</span>
                   </button>
 
-                  <button onclick="selectCategory('screen-recordings', this)" class="category-btn w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px]">
+                  <button onclick="selectCategory('screen-recordings', this); switchView('timeline')" class="category-btn w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px] cursor-pointer">
                     <span class="flex items-center gap-2">
                       <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Play%20button/3D/play_button_3d.png" class="w-3.5 h-3.5 object-contain" alt="Screen Recordings">
                       <span>Screen Recordings</span>
@@ -628,8 +625,8 @@
                 </div>
               </div>
 
-              <!-- Screenshots (User Requested) -->
-              <button onclick="selectCategory('screenshots', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+              <!-- Screenshots -->
+              <button onclick="selectCategory('screenshots', this); switchView('timeline')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer">
                 <span class="flex items-center gap-2.5">
                   <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Mobile%20phone/3D/mobile_phone_3d.png" class="w-4 h-4 object-contain" alt="Screenshots">
                   <span>Screenshots</span>
@@ -637,8 +634,8 @@
                 <span class="text-[11px] font-mono text-cyan-600 font-bold" id="cntScreenshots">84</span>
               </button>
 
-              <!-- Selfies (Apple Photos & Google Photos Category) -->
-              <button onclick="selectCategory('selfies', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+              <!-- Selfies -->
+              <button onclick="selectCategory('selfies', this); switchView('timeline')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer">
                 <span class="flex items-center gap-2.5">
                   <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Camera%20with%20flash/3D/camera_with_flash_3d.png" class="w-4 h-4 object-contain" alt="Selfies">
                   <span>Selfies</span>
@@ -647,7 +644,7 @@
               </button>
 
               <!-- Portraits (Depth) -->
-              <button onclick="selectCategory('portraits', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+              <button onclick="selectCategory('portraits', this); switchView('timeline')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer">
                 <span class="flex items-center gap-2.5">
                   <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Bust%20in%20silhouette/3D/bust_in_silhouette_3d.png" class="w-4 h-4 object-contain" alt="Portraits">
                   <span>Portraits (Depth)</span>
@@ -656,7 +653,7 @@
               </button>
 
               <!-- Live Photos -->
-              <button onclick="selectCategory('live-photos', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+              <button onclick="selectCategory('live-photos', this); switchView('timeline')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer">
                 <span class="flex items-center gap-2.5">
                   <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Cyclone/3D/cyclone_3d.png" class="w-4 h-4 object-contain" alt="Live Photos">
                   <span>Live Photos</span>
@@ -665,7 +662,7 @@
               </button>
 
               <!-- Apple ProRAW / DNG -->
-              <button onclick="selectCategory('raw', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+              <button onclick="selectCategory('raw', this); switchView('timeline')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer">
                 <span class="flex items-center gap-2.5">
                   <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Gem%20stone/3D/gem_stone_3d.png" class="w-4 h-4 object-contain" alt="Apple ProRAW">
                   <span>Apple ProRAW / DNG</span>
@@ -674,7 +671,7 @@
               </button>
 
               <!-- Panoramas -->
-              <button onclick="selectCategory('panoramas', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+              <button onclick="selectCategory('panoramas', this); switchView('timeline')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer">
                 <span class="flex items-center gap-2.5">
                   <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Sunrise/3D/sunrise_3d.png" class="w-4 h-4 object-contain" alt="Panoramas">
                   <span>Panoramas</span>
@@ -683,7 +680,7 @@
               </button>
 
               <!-- Animated / GIFs -->
-              <button onclick="selectCategory('animated', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+              <button onclick="selectCategory('animated', this); switchView('timeline')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer">
                 <span class="flex items-center gap-2.5">
                   <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Film%20frames/3D/film_frames_3d.png" class="w-4 h-4 object-contain" alt="Animated">
                   <span>Animated & GIFs</span>
@@ -708,8 +705,8 @@
             <!-- Utilities Semi-Subcategory Tree -->
             <nav id="utilitiesTree" class="sub-tree space-y-0.5 text-xs font-medium">
               
-              <!-- Near Duplicates (INSIDE UTILITIES PER USER REQUEST) -->
-              <button onclick="selectCategory('duplicates', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+              <!-- Near Duplicates (INSIDE UTILITIES) -->
+              <button onclick="selectCategory('duplicates', this); switchView('timeline')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer">
                 <span class="flex items-center gap-2">
                   <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Repeat%20button/3D/repeat_button_3d.png" class="w-4 h-4 object-contain" alt="Near Duplicates">
                   <span class="font-semibold">Duplicates</span>
@@ -718,7 +715,7 @@
               </button>
 
               <!-- To Sort (Inbox) -->
-              <button onclick="selectCategory('inbox', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+              <button onclick="selectCategory('inbox', this); switchView('timeline')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer">
                 <span class="flex items-center gap-2">
                   <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Inbox%20tray/3D/inbox_tray_3d.png" class="w-4 h-4 object-contain" alt="To sort">
                   <span>To sort (Inbox)</span>
@@ -727,7 +724,7 @@
               </button>
 
               <!-- Receipts & Documents (OCR) -->
-              <button onclick="selectCategory('documents', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+              <button onclick="selectCategory('documents', this); switchView('timeline')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer">
                 <span class="flex items-center gap-2">
                   <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Page%20facing%20up/3D/page_facing_up_3d.png" class="w-4 h-4 object-contain" alt="Documents">
                   <span>Receipts & Documents</span>
@@ -736,7 +733,7 @@
               </button>
 
               <!-- Hidden & Locked Vault -->
-              <button onclick="selectCategory('hidden', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+              <button onclick="selectCategory('hidden', this); switchView('timeline')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer">
                 <span class="flex items-center gap-2">
                   <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Locked/3D/locked_3d.png" class="w-4 h-4 object-contain" alt="Hidden">
                   <span>Hidden / Locked</span>
@@ -745,7 +742,7 @@
               </button>
 
               <!-- Imports & SD Card -->
-              <button onclick="selectCategory('imports', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+              <button onclick="selectCategory('imports', this); switchView('timeline')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer">
                 <span class="flex items-center gap-2">
                   <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Card%20file%20box/3D/card_file_box_3d.png" class="w-4 h-4 object-contain" alt="Imports">
                   <span>Imports & SD Cards</span>
@@ -754,44 +751,71 @@
               </button>
 
               <!-- Low Quality & Blurs (Triage) -->
-              <button onclick="selectCategory('low-quality', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+              <button onclick="selectCategory('low-quality', this); switchView('timeline')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer">
                 <span class="flex items-center gap-2">
                   <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Wrench/3D/wrench_3d.png" class="w-4 h-4 object-contain" alt="Low Quality">
                   <span>Low Quality & Blurs</span>
                 </span>
                 <span class="text-[11px] font-mono text-rose-500 font-bold">88</span>
               </button>
-
-              <!-- Recently Deleted / Finder Trash -->
-              <button onclick="selectCategory('trash', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg" style="color: #e11d48;">
-                <span class="flex items-center gap-2">
-                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Wastebasket/3D/wastebasket_3d.png" class="w-4 h-4 object-contain" alt="Trash">
-                  <span>Recently Deleted</span>
-                </span>
-                <span class="text-[11px] font-mono font-bold">14</span>
-              </button>
             </nav>
           </div>
 
         </div>
 
-        <!-- Sidebar Footer: Storage & Local Hardware Enclave Privacy -->
-        <div class="mt-3 pt-2.5 border-t space-y-1.5" style="border-color: var(--sidebar-border);">
-          <div class="p-2 rounded-lg flex items-center justify-between text-[11px] font-mono border" style="background: var(--card-bg); border-color: var(--card-border);">
-            <div class="flex items-center gap-2">
-              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Shield/3D/shield_3d.png" class="w-4 h-4 object-contain" alt="Security">
-              <div>
-                <p class="font-bold text-[10px]" style="color: var(--text-main);">Zero Cloud Egress</p>
-                <p class="text-[9px]" style="color: var(--text-muted);">Local NVMe Only</p>
+        <!-- ====================================================================
+             SIDEBAR FOOTER: P2P WI-FI SYNC (ABOVE TRASH) & RECENTLY DELETED
+             (User Requested: "keep wifi sync in left bottom corner above trash")
+             ==================================================================== -->
+        <div class="mt-3 pt-2.5 border-t space-y-2" style="border-color: var(--sidebar-border);">
+          
+          <!-- P2P Local Wi-Fi Mesh Sync Card (Repositioned to Left Bottom Corner Above Trash) -->
+          <div onclick="alert('P2P Local Wi-Fi Mesh Sync:\n• Service: _photovault._tcp.local\n• Connected Peers: MacBook Pro ↔ iPad Air 13\"\n• Protocol: TLS 1.3 Direct P2P over Wi-Fi 6E\n• Zero Cloud Egress: All synchronisation is 100% strictly local')" 
+               class="p-2.5 rounded-xl border space-y-1.5 transition-all hover:scale-[1.02] cursor-pointer shadow-xs" 
+               style="background: var(--card-bg); border-color: var(--card-border);" 
+               title="Click to inspect P2P Wi-Fi Sync status">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Antenna%20bars/3D/antenna_bars_3d.png" class="w-4 h-4 object-contain" alt="P2P Wi-Fi Sync">
+                <span class="text-xs font-bold" style="color: var(--text-main);">P2P Wi-Fi Sync</span>
+              </div>
+              <span class="flex items-center gap-1 text-[10px] font-mono text-emerald-600 font-bold">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Active</span>
+              </span>
+            </div>
+            <div class="text-[10px] font-mono space-y-0.5" style="color: var(--text-muted);">
+              <p class="truncate text-blue-500 font-medium">MacBook Pro ↔ iPad Air</p>
+              <div class="flex items-center justify-between text-[9px]">
+                <span>_photovault._tcp.local</span>
+                <span class="text-emerald-600 font-semibold">0 Cloud Egress</span>
               </div>
             </div>
-            <span class="text-[9px] text-emerald-600 font-bold">100% On-Device</span>
           </div>
+
+          <!-- Recently Deleted / Finder Trash (Located Directly Under Wi-Fi Sync) -->
+          <button onclick="selectCategory('trash', this); switchView('timeline')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer" style="color: #e11d48; background: rgba(225, 29, 72, 0.05); border: 1px solid rgba(225, 29, 72, 0.15);">
+            <span class="flex items-center gap-2">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Wastebasket/3D/wastebasket_3d.png" class="w-4 h-4 object-contain" alt="Trash">
+              <span class="font-semibold">Recently Deleted</span>
+            </span>
+            <span class="text-[11px] font-mono font-bold">14</span>
+          </button>
+
+          <!-- Zero Cloud Egress Hardware Enclave Badge -->
+          <div class="px-2 py-1 rounded-lg flex items-center justify-between text-[9px] font-mono" style="color: var(--text-muted);">
+            <span class="flex items-center gap-1.5">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Shield/3D/shield_3d.png" class="w-3 h-3 object-contain" alt="Security">
+              <span>Local NVMe Vault</span>
+            </span>
+            <span class="text-emerald-600 font-bold">100% Private</span>
+          </div>
+
         </div>
       </aside>
 
       <!-- ======================================================================
-           WORKSPACE (TIMELINE, EXPLORER, OR PLACES MAP)
+           WORKSPACE (TIMELINE, EXPLORER, PLACES MAP, OR PEOPLE & FACES)
            ====================================================================== -->
       <main class="flex-1 flex flex-col overflow-hidden" style="background: var(--main-bg);">
         
@@ -803,58 +827,63 @@
             <div class="absolute left-3.5 pointer-events-none flex items-center gap-1.5">
               <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Magnifying%20glass%20tilted%20left/3D/magnifying_glass_tilted_left_3d.png" class="w-4 h-4 object-contain" alt="Search">
             </div>
-            <input type="text" id="searchInput" oninput="filterPhotos()" placeholder="Natural Language Search: 'tokyo rainy street neon', 'golden retriever on grass', 'receipt over $50', 'raw portraits'..." class="w-full pl-10 pr-24 py-2 rounded-xl text-xs font-mono transition-all shadow-inner border focus:outline-hidden" style="background: var(--input-bg); border-color: var(--input-border); color: var(--input-text);">
+            <input type="text" id="searchInput" oninput="filterPhotos()" placeholder="Natural Language Search: 'tokyo rainy street neon', 'eleanor smiling at cafe', 'golden retriever on grass', 'receipt over $50'..." class="w-full pl-10 pr-24 py-2 rounded-xl text-xs font-mono transition-all shadow-inner border focus:outline-hidden" style="background: var(--input-bg); border-color: var(--input-border); color: var(--input-text);">
             <div class="absolute right-3 flex items-center gap-1.5 text-[10px] font-mono" style="color: var(--text-muted);">
-              <span class="px-1.5 py-0.5 rounded border" style="background: var(--badge-neutral-bg); border-color: var(--badge-neutral-border);">ANE: 2.1ms</span>
               <span class="px-1 py-0.5 rounded border" style="background: var(--badge-neutral-bg); border-color: var(--badge-neutral-border);">⌘F</span>
             </div>
           </div>
 
-          <!-- Quick Filter Pills: All, Favorites, Duplicates, To sort, Videos, Screenshots, Pets, Travel, Places Map, Portraits, Live Photos, ProRAW, Shared, Documents -->
+          <!-- Quick Filter Pills: All, Favorites, Duplicates, To sort, Videos, Screenshots, Pets, Travel, Places Map, People, Portraits, Live Photos, ProRAW, Shared, Documents -->
           <div class="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scroll text-xs">
-            <button onclick="selectCategory('all', this)" class="filter-pill active-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+            <button onclick="selectCategory('all', this); switchView('timeline')" class="filter-pill active-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
               <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Framed%20picture/3D/framed_picture_3d.png" class="w-3.5 h-3.5 object-contain" alt="All">
               <span>All</span>
             </button>
 
             <!-- Favorites Filter Pill -->
-            <button onclick="selectCategory('favorites', this)" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+            <button onclick="selectCategory('favorites', this); switchView('timeline')" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
               <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Red%20heart/3D/red_heart_3d.png" class="w-3.5 h-3.5 object-contain" alt="Favorites">
               <span>Favorites</span>
             </button>
 
+            <!-- People & Faces Filter Pill -->
+            <button onclick="selectCategory('people', this); switchView('people')" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Busts%20in%20silhouette/3D/busts_in_silhouette_3d.png" class="w-3.5 h-3.5 object-contain" alt="People">
+              <span>People & Faces</span>
+            </button>
+
             <!-- Duplicates Filter Pill (In Utility) -->
-            <button onclick="selectCategory('duplicates', this)" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+            <button onclick="selectCategory('duplicates', this); switchView('timeline')" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
               <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Repeat%20button/3D/repeat_button_3d.png" class="w-3.5 h-3.5 object-contain" alt="Duplicates">
               <span>Duplicates (Utility)</span>
             </button>
 
             <!-- To Sort Filter Pill -->
-            <button onclick="selectCategory('inbox', this)" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+            <button onclick="selectCategory('inbox', this); switchView('timeline')" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
               <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Inbox%20tray/3D/inbox_tray_3d.png" class="w-3.5 h-3.5 object-contain" alt="To sort">
               <span>To sort</span>
             </button>
 
             <!-- Videos Filter Pill -->
-            <button onclick="selectCategory('videos', this)" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+            <button onclick="selectCategory('videos', this); switchView('timeline')" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
               <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Video%20camera/3D/video_camera_3d.png" class="w-3.5 h-3.5 object-contain" alt="Videos">
               <span>Videos</span>
             </button>
 
             <!-- Screenshots Filter Pill -->
-            <button onclick="selectCategory('screenshots', this)" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+            <button onclick="selectCategory('screenshots', this); switchView('timeline')" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
               <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Mobile%20phone/3D/mobile_phone_3d.png" class="w-3.5 h-3.5 object-contain" alt="Screenshots">
               <span>Screenshots</span>
             </button>
 
             <!-- Pets Filter Pill -->
-            <button onclick="selectCategory('pets', this)" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+            <button onclick="selectCategory('pets', this); switchView('people')" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
               <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Paw%20prints/3D/paw_prints_3d.png" class="w-3.5 h-3.5 object-contain" alt="Pets">
               <span>Pets</span>
             </button>
 
             <!-- Travel Filter Pill -->
-            <button onclick="selectCategory('travel', this)" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+            <button onclick="selectCategory('travel', this); switchView('timeline')" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
               <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Airplane/3D/airplane_3d.png" class="w-3.5 h-3.5 object-contain" alt="Travel">
               <span>Travel</span>
             </button>
@@ -866,31 +895,31 @@
             </button>
 
             <!-- Portraits Filter Pill -->
-            <button onclick="selectCategory('portraits', this)" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+            <button onclick="selectCategory('portraits', this); switchView('timeline')" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
               <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Bust%20in%20silhouette/3D/bust_in_silhouette_3d.png" class="w-3.5 h-3.5 object-contain" alt="Portraits">
               <span>Portraits</span>
             </button>
 
             <!-- Live Photos Filter Pill -->
-            <button onclick="selectCategory('live-photos', this)" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+            <button onclick="selectCategory('live-photos', this); switchView('timeline')" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
               <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Cyclone/3D/cyclone_3d.png" class="w-3.5 h-3.5 object-contain" alt="Live Photos">
               <span>Live Photos</span>
             </button>
 
             <!-- Apple ProRAW Filter Pill -->
-            <button onclick="selectCategory('raw', this)" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+            <button onclick="selectCategory('raw', this); switchView('timeline')" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
               <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Gem%20stone/3D/gem_stone_3d.png" class="w-3.5 h-3.5 object-contain" alt="ProRAW">
               <span>Apple ProRAW</span>
             </button>
 
             <!-- Shared Filter Pill -->
-            <button onclick="selectCategory('shared-albums', this)" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+            <button onclick="selectCategory('shared-albums', this); switchView('timeline')" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
               <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Globe%20with%20meridians/3D/globe_with_meridians_3d.png" class="w-3.5 h-3.5 object-contain" alt="Shared">
               <span>Shared</span>
             </button>
 
             <!-- Documents Filter Pill -->
-            <button onclick="selectCategory('documents', this)" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+            <button onclick="selectCategory('documents', this); switchView('timeline')" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
               <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Page%20facing%20up/3D/page_facing_up_3d.png" class="w-3.5 h-3.5 object-contain" alt="Documents">
               <span>Documents</span>
             </button>
@@ -902,66 +931,58 @@
              ==================================================================== -->
         <div id="viewTimeline" class="flex-1 flex flex-col overflow-hidden">
           
-          <!-- People & Pets Face Strip Carousel -->
+          <!-- People & Pets Face Strip Carousel (Quick access) -->
           <div id="peopleFaceStrip" class="px-4 py-2.5 border-b flex items-center gap-3 overflow-x-auto custom-scroll shrink-0 select-none" style="border-color: var(--sub-bar-border); background: var(--header-bg);">
-            <div class="flex items-center gap-1.5 shrink-0 pr-2 border-r" style="border-color: var(--tree-line);">
+            <div class="flex items-center gap-1.5 shrink-0 pr-2 border-r cursor-pointer" style="border-color: var(--tree-line);" onclick="switchView('people')">
               <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Busts%20in%20silhouette/3D/busts_in_silhouette_3d.png" class="w-4 h-4 object-contain" alt="People & Pets">
-              <span class="text-[11px] font-bold tracking-tight" style="color: var(--text-main);">People & Pets</span>
+              <span class="text-[11px] font-bold tracking-tight hover:underline" style="color: var(--text-main);">People & Faces</span>
             </div>
 
             <!-- Face 1: Eleanor -->
-            <button onclick="filterPerson('Eleanor')" class="flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all hover:scale-105 shrink-0 cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">
+            <button onclick="openPersonDetail('Eleanor', 142, 'Family & Favorites', 'bg-gradient-to-tr from-amber-400 to-rose-400')" class="flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all hover:scale-105 shrink-0 cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">
               <div class="w-5 h-5 rounded-full bg-gradient-to-tr from-amber-400 to-rose-400 border border-white/60"></div>
               <span class="text-xs font-medium" style="color: var(--text-main);">Eleanor</span>
-              <span class="text-[10px] font-mono" style="color: var(--text-muted);">142</span>
+              <span class="text-[10px] font-mono text-rose-500 font-bold">142</span>
             </button>
 
             <!-- Face 2: Sarah -->
-            <button onclick="filterPerson('Sarah')" class="flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all hover:scale-105 shrink-0 cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">
+            <button onclick="openPersonDetail('Sarah', 98, 'Friend', 'bg-gradient-to-tr from-sky-400 to-indigo-500')" class="flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all hover:scale-105 shrink-0 cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">
               <div class="w-5 h-5 rounded-full bg-gradient-to-tr from-sky-400 to-indigo-500 border border-white/60"></div>
               <span class="text-xs font-medium" style="color: var(--text-main);">Sarah</span>
               <span class="text-[10px] font-mono" style="color: var(--text-muted);">98</span>
             </button>
 
             <!-- Face 3: Marcus -->
-            <button onclick="filterPerson('Marcus')" class="flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all hover:scale-105 shrink-0 cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">
+            <button onclick="openPersonDetail('Marcus', 84, 'Friend', 'bg-gradient-to-tr from-emerald-400 to-teal-600')" class="flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all hover:scale-105 shrink-0 cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">
               <div class="w-5 h-5 rounded-full bg-gradient-to-tr from-emerald-400 to-teal-600 border border-white/60"></div>
               <span class="text-xs font-medium" style="color: var(--text-main);">Marcus</span>
               <span class="text-[10px] font-mono" style="color: var(--text-muted);">84</span>
             </button>
 
             <!-- Face 4: Maya -->
-            <button onclick="filterPerson('Maya')" class="flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all hover:scale-105 shrink-0 cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">
+            <button onclick="openPersonDetail('Maya', 76, 'Partner', 'bg-gradient-to-tr from-pink-400 to-purple-600')" class="flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all hover:scale-105 shrink-0 cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">
               <div class="w-5 h-5 rounded-full bg-gradient-to-tr from-pink-400 to-purple-600 border border-white/60"></div>
               <span class="text-xs font-medium" style="color: var(--text-main);">Maya</span>
-              <span class="text-[10px] font-mono" style="color: var(--text-muted);">76</span>
+              <span class="text-[10px] font-mono text-purple-600 font-bold">76</span>
             </button>
 
             <!-- Pet 1: Milo (Golden Retriever) -->
-            <button onclick="filterPerson('Milo')" class="flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all hover:scale-105 shrink-0 cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">
+            <button onclick="openPersonDetail('Milo (Dog)', 54, 'Pet', 'bg-gradient-to-tr from-amber-400 to-yellow-600')" class="flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all hover:scale-105 shrink-0 cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">
               <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Dog%20face/3D/dog_face_3d.png" class="w-4 h-4 object-contain" alt="Milo">
               <span class="text-xs font-medium" style="color: var(--text-main);">Milo (Dog)</span>
               <span class="text-[10px] font-mono text-amber-600 font-bold">54</span>
             </button>
 
             <!-- Pet 2: Luna (Tabby Cat) -->
-            <button onclick="filterPerson('Luna')" class="flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all hover:scale-105 shrink-0 cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">
+            <button onclick="openPersonDetail('Luna (Cat)', 38, 'Pet', 'bg-gradient-to-tr from-indigo-400 to-pink-500')" class="flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all hover:scale-105 shrink-0 cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">
               <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Cat%20face/3D/cat_face_3d.png" class="w-4 h-4 object-contain" alt="Luna">
               <span class="text-xs font-medium" style="color: var(--text-main);">Luna (Cat)</span>
               <span class="text-[10px] font-mono text-indigo-500 font-bold">38</span>
             </button>
 
-            <!-- Face 5: Kai -->
-            <button onclick="filterPerson('Kai')" class="flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all hover:scale-105 shrink-0 cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">
-              <div class="w-5 h-5 rounded-full bg-gradient-to-tr from-orange-400 to-amber-500 border border-white/60"></div>
-              <span class="text-xs font-medium" style="color: var(--text-main);">Kai</span>
-              <span class="text-[10px] font-mono" style="color: var(--text-muted);">42</span>
-            </button>
-
-            <!-- Unnamed Cluster -->
-            <button onclick="filterPerson('unnamed')" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-dashed transition-all hover:scale-105 shrink-0 cursor-pointer" style="background: rgba(0,0,0,0.02); border-color: var(--text-faint);">
-              <span class="text-xs" style="color: var(--text-muted);">+ Unnamed Cluster</span>
-              <span class="text-[10px] font-mono" style="color: var(--text-muted);">12</span>
+            <!-- Unnamed Cluster (Click to open People Manager) -->
+            <button onclick="switchView('people')" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-dashed transition-all hover:scale-105 shrink-0 cursor-pointer" style="background: rgba(0,0,0,0.02); border-color: var(--text-faint);">
+              <span class="text-xs font-medium text-purple-600">+ Track All 23 People</span>
             </button>
           </div>
 
@@ -985,15 +1006,20 @@
               <!-- Responsive Photo Grid with 12 Representative Cards -->
               <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3" id="photoCardsGrid">
                 
-                <!-- CARD 1: Near Duplicate in Utility (Tokyo Street Night) -->
-                <div onclick="selectCard(this, 'IMG_4920.DNG', '7008x4672', '58.4 MB', 'Sony α7 IV', 'f/2.8', '1/1000s', '100', '35.6764° N, 139.6500° E', true, false, 'Tokyo, Japan', 'travel,duplicates,raw')" 
+                <!-- CARD 1: Near Duplicate in Utility (Tokyo Street Night - Eleanor) -->
+                <div onclick="selectCard(this, 'IMG_4920.DNG', '7008x4672', '58.4 MB', 'Sony α7 IV', 'f/2.8', '1/1000s', '100', '35.6764° N, 139.6500° E', true, false, 'Tokyo, Japan', 'travel,duplicates,raw,eleanor')" 
                      class="photo-card active-card glass-card group relative aspect-square rounded-xl overflow-hidden cursor-pointer" 
-                     data-tags="tokyo rainy street neon night duplicate raw travel" 
+                     data-tags="tokyo rainy street neon night duplicate raw travel eleanor" 
                      data-category="duplicates" 
                      data-favorite="false">
                   <div class="absolute inset-0 bg-gradient-to-tr from-amber-600/70 via-orange-500/50 to-indigo-600/60 group-hover:scale-105 transition-transform duration-300"></div>
                   
-                  <div class="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                  <!-- Face Bounding Box (Simulated On-Device CoreML Face Tracking) -->
+                  <div class="face-box-overlay absolute top-[28%] left-[34%] w-[32%] h-[32%] rounded-lg z-10 pointer-events-none flex flex-col justify-between p-1">
+                    <span class="text-[8px] font-mono font-bold bg-emerald-600 text-white px-1 rounded shadow-xs w-max">Eleanor 99.4%</span>
+                  </div>
+
+                  <div class="absolute top-2 left-2 flex flex-col gap-1 items-start z-20">
                     <span class="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold shadow-xs border flex items-center gap-1 backdrop-blur-md" style="background: rgba(255, 255, 255, 0.92); color: #4338ca; border-color: rgba(99, 102, 241, 0.3);">
                       <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Repeat%20button/3D/repeat_button_3d.png" class="w-3 h-3 object-contain" alt="Dup">
                       <span>Duplicate #D-104</span>
@@ -1004,8 +1030,8 @@
                     </span>
                   </div>
 
-                  <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white text-[10px] font-mono drop-shadow-md">
-                    <span class="truncate">Tokyo Shibuya Neon</span>
+                  <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white text-[10px] font-mono drop-shadow-md z-20">
+                    <span class="truncate">Tokyo Shibuya (Eleanor)</span>
                     <span>DNG</span>
                   </div>
                 </div>
@@ -1036,32 +1062,37 @@
                 </div>
 
                 <!-- CARD 3: Pet (Milo the Golden Retriever) -->
-                <div onclick="selectCard(this, 'IMG_2048.HEIC', '4032x3024', '4.2 MB', 'iPhone 16 Pro', 'f/1.8', '1/500s', '64', '37.7749° N, 122.4194° W', false, true, 'San Francisco, CA', 'pets,portraits')" 
+                <div onclick="selectCard(this, 'IMG_2048.HEIC', '4032x3024', '4.2 MB', 'iPhone 16 Pro', 'f/1.8', '1/500s', '64', '37.7749° N, 122.4194° W', false, true, 'San Francisco, CA', 'pets,portraits,milo')" 
                      class="photo-card glass-card group relative aspect-square rounded-xl overflow-hidden cursor-pointer" 
                      data-tags="dog pet milo golden retriever grass park animal" 
                      data-category="pets" 
                      data-favorite="true">
                   <div class="absolute inset-0 bg-gradient-to-tr from-amber-400/80 via-yellow-500/60 to-emerald-600/50 group-hover:scale-105 transition-transform duration-300"></div>
                   
-                  <div class="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                  <!-- Pet Detection Bounding Box -->
+                  <div class="face-box-overlay absolute top-[25%] left-[30%] w-[40%] h-[40%] rounded-lg z-10 pointer-events-none flex flex-col justify-between p-1">
+                    <span class="text-[8px] font-mono font-bold bg-amber-600 text-white px-1 rounded shadow-xs w-max">Milo (Dog) 98.7%</span>
+                  </div>
+
+                  <div class="absolute top-2 left-2 flex flex-col gap-1 items-start z-20">
                     <span class="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold shadow-xs border flex items-center gap-1 backdrop-blur-md" style="background: rgba(255, 255, 255, 0.92); color: #d97706; border-color: rgba(217, 119, 6, 0.3);">
                       <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Dog%20face/3D/dog_face_3d.png" class="w-3 h-3 object-contain" alt="Dog">
                       <span>Milo (Golden)</span>
                     </span>
                   </div>
 
-                  <div class="absolute top-2 right-2">
+                  <div class="absolute top-2 right-2 z-20">
                     <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Red%20heart/3D/red_heart_3d.png" class="w-4 h-4 object-contain drop-shadow" alt="Favorited">
                   </div>
 
-                  <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white text-[10px] font-mono drop-shadow-md">
+                  <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white text-[10px] font-mono drop-shadow-md z-20">
                     <span class="truncate">Presidio Sunny Run</span>
                     <span>Portrait</span>
                   </div>
                 </div>
 
                 <!-- CARD 4: Pet (Luna the Tabby Cat) -->
-                <div onclick="selectCard(this, 'IMG_3120.HEIC', '4032x3024', '3.8 MB', 'iPhone 15 Pro', 'f/1.78', '1/250s', '125', '37.7690° N, 122.4467° W', false, false, 'San Francisco, CA', 'pets,live-photos')" 
+                <div onclick="selectCard(this, 'IMG_3120.HEIC', '4032x3024', '3.8 MB', 'iPhone 15 Pro', 'f/1.78', '1/250s', '125', '37.7690° N, 122.4467° W', false, false, 'San Francisco, CA', 'pets,live-photos,luna')" 
                      class="photo-card glass-card group relative aspect-square rounded-xl overflow-hidden cursor-pointer" 
                      data-tags="cat pet luna tabby window sunshine whiskers" 
                      data-category="pets" 
@@ -1085,7 +1116,37 @@
                   </div>
                 </div>
 
-                <!-- CARD 5: Travel & Trips (Dolomites Italian Alps) -->
+                <!-- CARD 5: Portrait (Sarah Depth Map) -->
+                <div onclick="selectCard(this, 'IMG_4812.HEIC', '4032x3024', '4.6 MB', 'iPhone 16 Pro', 'f/2.8', '1/320s', '80', '37.7749° N, 122.4194° W', false, true, 'San Francisco, CA', 'portraits,favorites,sarah')" 
+                     class="photo-card glass-card group relative aspect-square rounded-xl overflow-hidden cursor-pointer" 
+                     data-tags="sarah portrait bokeh depth cafe girl" 
+                     data-category="portraits" 
+                     data-favorite="true">
+                  <div class="absolute inset-0 bg-gradient-to-tr from-rose-500/60 via-pink-400/50 to-purple-600/60 group-hover:scale-105 transition-transform duration-300"></div>
+                  
+                  <!-- Face Bounding Box (Sarah) -->
+                  <div class="face-box-overlay absolute top-[20%] left-[32%] w-[36%] h-[36%] rounded-lg z-10 pointer-events-none flex flex-col justify-between p-1">
+                    <span class="text-[8px] font-mono font-bold bg-rose-600 text-white px-1 rounded shadow-xs w-max">Sarah 98.9%</span>
+                  </div>
+
+                  <div class="absolute top-2 left-2 flex flex-col gap-1 items-start z-20">
+                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold shadow-xs border flex items-center gap-1 backdrop-blur-md" style="background: rgba(255, 255, 255, 0.92); color: #e11d48; border-color: rgba(225, 29, 72, 0.3);">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Bust%20in%20silhouette/3D/bust_in_silhouette_3d.png" class="w-3 h-3 object-contain" alt="Portrait">
+                      <span>Portrait · Depth f/2.8</span>
+                    </span>
+                  </div>
+
+                  <div class="absolute top-2 right-2 z-20">
+                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Red%20heart/3D/red_heart_3d.png" class="w-4 h-4 object-contain drop-shadow" alt="Favorited">
+                  </div>
+
+                  <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white text-[10px] font-mono drop-shadow-md z-20">
+                    <span class="truncate">Sarah at Blue Bottle</span>
+                    <span>Depth Map</span>
+                  </div>
+                </div>
+
+                <!-- CARD 6: Travel & Trips (Dolomites Italian Alps) -->
                 <div onclick="selectCard(this, 'IMG_7102.DNG', '8256x5504', '64.2 MB', 'Nikon Z8', 'f/8.0', '1/400s', '64', '46.5405° N, 12.1357° E', false, true, 'Dolomites, Italy', 'travel,raw,favorites')" 
                      class="photo-card glass-card group relative aspect-square rounded-xl overflow-hidden cursor-pointer" 
                      data-tags="dolomites mountains italy alps peaks hiking travel raw" 
@@ -1114,31 +1175,6 @@
                   </div>
                 </div>
 
-                <!-- CARD 6: Travel (Yosemite Valley Half Dome) -->
-                <div onclick="selectCard(this, 'IMG_6820.DNG', '7008x4672', '52.1 MB', 'Sony α7 IV', 'f/5.6', '1/800s', '100', '37.7456° N, 119.5936° W', false, true, 'Yosemite, CA', 'travel,raw,favorites')" 
-                     class="photo-card glass-card group relative aspect-square rounded-xl overflow-hidden cursor-pointer" 
-                     data-tags="yosemite national park half dome granite cliff travel landscape" 
-                     data-category="travel" 
-                     data-favorite="true">
-                  <div class="absolute inset-0 bg-gradient-to-tr from-amber-500/60 via-stone-500/50 to-blue-600/50 group-hover:scale-105 transition-transform duration-300"></div>
-                  
-                  <div class="absolute top-2 left-2 flex flex-col gap-1 items-start">
-                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold shadow-xs border flex items-center gap-1 backdrop-blur-md" style="background: rgba(255, 255, 255, 0.92); color: #d97706; border-color: rgba(217, 119, 6, 0.3);">
-                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Round%20pushpin/3D/round_pushpin_3d.png" class="w-3 h-3 object-contain" alt="Pin">
-                      <span>Yosemite Valley</span>
-                    </span>
-                  </div>
-
-                  <div class="absolute top-2 right-2">
-                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Red%20heart/3D/red_heart_3d.png" class="w-4 h-4 object-contain drop-shadow" alt="Favorited">
-                  </div>
-
-                  <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white text-[10px] font-mono drop-shadow-md">
-                    <span class="truncate">Half Dome Sunset</span>
-                    <span>33MP RAW</span>
-                  </div>
-                </div>
-
                 <!-- CARD 7: Screenshots (Xcode Debug Session) -->
                 <div onclick="selectCard(this, 'Screenshot_20261024_1102.PNG', '3024x1964', '3.1 MB', 'macOS Sequoia 15.1', 'N/A', 'N/A', 'N/A', '37.7749° N, 122.4194° W', false, false, 'San Francisco, CA', 'screenshots')" 
                      class="photo-card glass-card group relative aspect-square rounded-xl overflow-hidden cursor-pointer" 
@@ -1149,8 +1185,8 @@
                     <div class="w-full h-full rounded border border-white/10 bg-black/40 p-2 font-mono text-[8px] text-emerald-400 overflow-hidden leading-tight">
                       <span class="text-blue-400">$</span> agy build --target ane<br>
                       <span class="text-gray-400">[info]</span> Compiling MobileCLIP-B/16 CoreML<br>
-                      <span class="text-gray-400">[info]</span> ANE latency: 2.1ms verified<br>
-                      <span class="text-emerald-400">✓ Vault Ready</span>
+                      <span class="text-gray-400">[info]</span> CoreML Face Embeddings: 512-D<br>
+                      <span class="text-emerald-400">✓ 23 People Clustered</span>
                     </div>
                   </div>
                   
@@ -1220,18 +1256,18 @@
                   </div>
                 </div>
 
-                <!-- CARD 10: Portrait (Sarah Depth Map) -->
-                <div onclick="selectCard(this, 'IMG_4812.HEIC', '4032x3024', '4.6 MB', 'iPhone 16 Pro', 'f/2.8', '1/320s', '80', '37.7749° N, 122.4194° W', false, true, 'San Francisco, CA', 'portraits,favorites')" 
+                <!-- CARD 10: Travel (Yosemite Valley Half Dome) -->
+                <div onclick="selectCard(this, 'IMG_6820.DNG', '7008x4672', '52.1 MB', 'Sony α7 IV', 'f/5.6', '1/800s', '100', '37.7456° N, 119.5936° W', false, true, 'Yosemite, CA', 'travel,raw,favorites')" 
                      class="photo-card glass-card group relative aspect-square rounded-xl overflow-hidden cursor-pointer" 
-                     data-tags="sarah portrait bokeh depth cafe girl" 
-                     data-category="portraits" 
+                     data-tags="yosemite national park half dome granite cliff travel landscape" 
+                     data-category="travel" 
                      data-favorite="true">
-                  <div class="absolute inset-0 bg-gradient-to-tr from-rose-500/60 via-pink-400/50 to-purple-600/60 group-hover:scale-105 transition-transform duration-300"></div>
+                  <div class="absolute inset-0 bg-gradient-to-tr from-amber-500/60 via-stone-500/50 to-blue-600/50 group-hover:scale-105 transition-transform duration-300"></div>
                   
                   <div class="absolute top-2 left-2 flex flex-col gap-1 items-start">
-                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold shadow-xs border flex items-center gap-1 backdrop-blur-md" style="background: rgba(255, 255, 255, 0.92); color: #e11d48; border-color: rgba(225, 29, 72, 0.3);">
-                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Bust%20in%20silhouette/3D/bust_in_silhouette_3d.png" class="w-3 h-3 object-contain" alt="Portrait">
-                      <span>Portrait · Depth f/2.8</span>
+                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold shadow-xs border flex items-center gap-1 backdrop-blur-md" style="background: rgba(255, 255, 255, 0.92); color: #d97706; border-color: rgba(217, 119, 6, 0.3);">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Round%20pushpin/3D/round_pushpin_3d.png" class="w-3 h-3 object-contain" alt="Pin">
+                      <span>Yosemite Valley</span>
                     </span>
                   </div>
 
@@ -1240,8 +1276,8 @@
                   </div>
 
                   <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white text-[10px] font-mono drop-shadow-md">
-                    <span class="truncate">Sarah at Blue Bottle</span>
-                    <span>Depth Map</span>
+                    <span class="truncate">Half Dome Sunset</span>
+                    <span>33MP RAW</span>
                   </div>
                 </div>
 
@@ -1397,8 +1433,7 @@
         </div>
 
         <!-- ====================================================================
-             VIEW 3: PLACES & GEOGRAPHY MAP LOCATION VIEW (USER REQUESTED FEATURE)
-             "where user can see the details of all photos"
+             VIEW 3: PLACES & GEOGRAPHY MAP LOCATION VIEW
              ==================================================================== -->
         <div id="viewMap" class="flex-1 flex flex-col overflow-hidden hidden">
           
@@ -1449,7 +1484,7 @@
               <!-- Interactive Pins Placed Across Map Canvas -->
               <div id="mapPinsContainer" class="absolute inset-0 z-0 pointer-events-auto">
                 
-                <!-- PIN 1: Tokyo, Japan (35.6764° N, 139.6500° E) -->
+                <!-- PIN 1: Tokyo, Japan -->
                 <div onclick="selectPinLocation('Tokyo, Japan', '35.6764° N, 139.6500° E', '420 photos', 'IMG_4920.DNG')" class="absolute top-[38%] left-[76%] transform -translate-x-1/2 -translate-y-1/2 cursor-pointer group">
                   <div class="relative flex flex-col items-center">
                     <div class="w-10 h-10 rounded-full bg-rose-500/20 pin-pulse absolute"></div>
@@ -1463,7 +1498,7 @@
                   </div>
                 </div>
 
-                <!-- PIN 2: San Francisco, CA (37.7749° N, 122.4194° W) -->
+                <!-- PIN 2: San Francisco, CA -->
                 <div onclick="selectPinLocation('San Francisco, CA', '37.7749° N, 122.4194° W', '652 photos', 'IMG_2048.HEIC')" class="absolute top-[42%] left-[22%] transform -translate-x-1/2 -translate-y-1/2 cursor-pointer group">
                   <div class="relative flex flex-col items-center">
                     <div class="w-10 h-10 rounded-full bg-blue-500/20 pin-pulse absolute"></div>
@@ -1477,7 +1512,7 @@
                   </div>
                 </div>
 
-                <!-- PIN 3: Yosemite National Park, CA (37.7456° N, 119.5936° W) -->
+                <!-- PIN 3: Yosemite National Park, CA -->
                 <div onclick="selectPinLocation('Yosemite, CA', '37.7456° N, 119.5936° W', '312 photos', 'IMG_6820.DNG')" class="absolute top-[44%] left-[25%] transform -translate-x-1/2 -translate-y-1/2 cursor-pointer group">
                   <div class="relative flex flex-col items-center">
                     <div class="w-8 h-8 rounded-full shadow-lg border-2 border-white flex items-center justify-center transition-transform group-hover:scale-125" style="background: #d97706;">
@@ -1490,7 +1525,7 @@
                   </div>
                 </div>
 
-                <!-- PIN 4: Dolomites, Italy (46.5405° N, 12.1357° E) -->
+                <!-- PIN 4: Dolomites, Italy -->
                 <div onclick="selectPinLocation('Dolomites, Italy', '46.5405° N, 12.1357° E', '185 photos', 'IMG_7102.DNG')" class="absolute top-[32%] left-[51%] transform -translate-x-1/2 -translate-y-1/2 cursor-pointer group">
                   <div class="relative flex flex-col items-center">
                     <div class="w-8 h-8 rounded-full shadow-lg border-2 border-white flex items-center justify-center transition-transform group-hover:scale-125" style="background: #059669;">
@@ -1503,7 +1538,7 @@
                   </div>
                 </div>
 
-                <!-- PIN 5: Kyoto, Japan (35.0116° N, 135.7681° E) -->
+                <!-- PIN 5: Kyoto, Japan -->
                 <div onclick="selectPinLocation('Kyoto, Japan', '35.0116° N, 135.7681° E', '160 photos', 'IMG_5190.HEIC')" class="absolute top-[41%] left-[74%] transform -translate-x-1/2 -translate-y-1/2 cursor-pointer group">
                   <div class="relative flex flex-col items-center">
                     <div class="w-8 h-8 rounded-full shadow-lg border-2 border-white flex items-center justify-center transition-transform group-hover:scale-125" style="background: #7c3aed;">
@@ -1525,7 +1560,7 @@
               </div>
             </div>
 
-            <!-- Right: COMPREHENSIVE PHOTO DETAILS & GEOGRAPHY INSPECTOR (USER REQUESTED) -->
+            <!-- Right: COMPREHENSIVE PHOTO DETAILS & GEOGRAPHY INSPECTOR -->
             <div class="w-full lg:w-96 p-4 flex flex-col justify-between overflow-y-auto custom-scroll border-t lg:border-t-0 lg:border-l shrink-0" style="background: var(--sidebar-bg); border-color: var(--sidebar-border);">
               <div class="space-y-4">
                 
@@ -1619,16 +1654,12 @@
                   
                   <div class="p-2.5 rounded-lg border text-xs font-mono space-y-1.5" style="background: var(--card-bg); border-color: var(--card-border);">
                     <div class="flex justify-between">
-                      <span style="color: var(--text-muted);">MobileCLIP Latency:</span>
-                      <span class="text-emerald-600 font-bold">2.1 ms (M3 Max Neural Engine)</span>
+                      <span style="color: var(--text-muted);">Identified Entities:</span>
+                      <span class="text-purple-600 font-semibold">Eleanor (99.4%) · Neon Street</span>
                     </div>
                     <div class="flex justify-between">
                       <span style="color: var(--text-muted);">Aesthetic Quality:</span>
                       <span class="text-amber-500 font-bold">9.6 / 10 (Gold Tier)</span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span style="color: var(--text-muted);">Identified Entities:</span>
-                      <span class="text-purple-600 font-semibold">Eleanor (99.4%) · Neon Street</span>
                     </div>
                     <div class="flex justify-between">
                       <span style="color: var(--text-muted);">Local Hash:</span>
@@ -1651,10 +1682,230 @@
           </div>
         </div>
 
+        <!-- ====================================================================
+             VIEW 4: PEOPLE & FACES COLLECTION & TRACKING VIEW (USER REQUESTED)
+             "user can see the people and track the people just collect the face of all the person just like apple photos"
+             ==================================================================== -->
+        <div id="viewPeople" class="flex-1 flex flex-col overflow-hidden hidden">
+          
+          <!-- Top Control Header for People & Pets View -->
+          <div class="px-5 py-3 border-b flex flex-wrap items-center justify-between gap-3 shrink-0 select-none" style="background: var(--header-bg); border-color: var(--sub-bar-border);">
+            <div class="flex items-center gap-3">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Busts%20in%20silhouette/3D/busts_in_silhouette_3d.png" class="w-6 h-6 object-contain" alt="People & Faces">
+              <div>
+                <h2 class="text-sm font-bold tracking-tight" style="color: var(--text-main);">People, Pets & Face Tracking</h2>
+                <p class="text-[11px] font-mono" style="color: var(--text-muted);">23 People & 4 Pets recognized by On-Device Vision Embeddings · Zero Cloud Leakage</p>
+              </div>
+            </div>
+
+            <!-- Action Controls -->
+            <div class="flex items-center gap-2 text-xs font-mono">
+              <button onclick="toggleFaceBoxes()" id="btnToggleFaceBoxes" class="px-3 py-1.5 rounded-lg border flex items-center gap-1.5 transition-all cursor-pointer" style="background: var(--btn-ghost-bg); border-color: var(--btn-ghost-border); color: var(--text-main);" title="Toggle Face Bounding Box Overlays">
+                <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Eye/3D/eye_3d.png" class="w-3.5 h-3.5 object-contain" alt="Eye">
+                <span id="faceBoxLabel">Face Focus Boxes: ON</span>
+              </button>
+
+              <button onclick="confirmAllCandidateFaces()" class="px-3 py-1.5 rounded-lg border font-semibold flex items-center gap-1.5 transition-all cursor-pointer" style="background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3); color: #047857;">
+                <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Check%20mark%20button/3D/check_mark_button_3d.png" class="w-3.5 h-3.5 object-contain" alt="Confirm">
+                <span>Confirm 18 Candidate Faces</span>
+              </button>
+
+              <button onclick="promptAddPerson()" class="px-3 py-1.5 rounded-lg border font-semibold flex items-center gap-1.5 transition-all cursor-pointer" style="background: var(--btn-primary-bg); color: var(--btn-primary-text);">
+                <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Plus/3D/plus_3d.png" class="w-3.5 h-3.5 object-contain" alt="Add Person">
+                <span>Add Person Name</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Main Scrollable Area for People & Tracking Hub -->
+          <div class="flex-1 overflow-y-auto p-5 custom-scroll space-y-6">
+            
+            <!-- SECTION 1: "REVIEW ADDITIONAL PHOTOS" APPLE PHOTOS TRACKING BANNER -->
+            <div class="p-4 rounded-2xl border shadow-sm flex flex-col md:flex-row items-center justify-between gap-4" style="background: var(--card-bg); border-color: rgba(99, 102, 241, 0.3);">
+              <div class="flex items-center gap-3.5">
+                <div class="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border" style="background: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.2);">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Identification%20card/3D/identification_card_3d.png" class="w-7 h-7 object-contain" alt="Face ID">
+                </div>
+                <div>
+                  <h3 class="text-xs font-bold tracking-tight" style="color: var(--text-main);">Confirm Additional Candidate Faces for Eleanor</h3>
+                  <p class="text-[11px] font-mono mt-0.5" style="color: var(--text-muted);">Neural Gallery found 18 photos that might be Eleanor. Confirming helps calibrate local face vectors on your Mac.</p>
+                </div>
+              </div>
+
+              <!-- Candidate Face Quick Actions -->
+              <div class="flex items-center gap-2 shrink-0">
+                <button onclick="alert('Confirmed all 18 photos as Eleanor. Local face embeddings updated.')" class="px-3 py-1.5 rounded-xl text-xs font-semibold tracking-wide text-white bg-indigo-600 hover:bg-indigo-700 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Check%20mark%20button/3D/check_mark_button_3d.png" class="w-3.5 h-3.5 object-contain" alt="Confirm">
+                  <span>Confirm All (18)</span>
+                </button>
+                <button onclick="alert('Opening interactive side-by-side face verification panel...')" class="px-3 py-1.5 rounded-xl text-xs font-medium border hover:bg-black/5 transition-all cursor-pointer" style="border-color: var(--pill-border); color: var(--text-secondary);">
+                  <span>Review Individually</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- SECTION 2: FAVORITE & PINNED PEOPLE GRID -->
+            <div>
+              <div class="flex items-center justify-between mb-3 px-1">
+                <div class="flex items-center gap-2">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Star/3D/star_3d.png" class="w-4 h-4 object-contain" alt="Star">
+                  <h3 class="text-xs font-bold uppercase tracking-wider font-mono" style="color: var(--text-main);">Pinned People & Pets</h3>
+                </div>
+                <span class="text-[11px] font-mono" style="color: var(--text-muted);">5 Favorites</span>
+              </div>
+
+              <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                
+                <!-- PERSON CARD 1: Eleanor (Primary Featured) -->
+                <div onclick="openPersonDetail('Eleanor', 142, 'Family & Favorites', 'bg-gradient-to-tr from-amber-400 to-rose-400')" class="glass-card group p-3.5 rounded-2xl flex flex-col items-center text-center cursor-pointer relative transition-all hover:scale-[1.03]">
+                  <div class="absolute top-2.5 right-2.5">
+                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Star/3D/star_3d.png" class="w-4 h-4 object-contain" alt="Starred">
+                  </div>
+                  <!-- High-Res Circular Face Avatar with Focus Ring -->
+                  <div class="w-24 h-24 rounded-full bg-gradient-to-tr from-amber-400 via-rose-400 to-purple-500 p-1 shadow-md mb-2.5 group-hover:shadow-lg transition-shadow">
+                    <div class="w-full h-full rounded-full border-2 border-white bg-amber-200/50 flex items-center justify-center overflow-hidden">
+                      <span class="text-2xl font-bold text-white drop-shadow">E</span>
+                    </div>
+                  </div>
+                  <h4 class="text-xs font-bold truncate w-full" style="color: var(--text-main);">Eleanor</h4>
+                  <p class="text-[10px] font-mono text-rose-500 font-semibold">142 photos</p>
+                  <span class="mt-1.5 text-[9px] font-mono px-2 py-0.5 rounded-full border" style="background: rgba(16, 185, 129, 0.1); color: #047857; border-color: rgba(16, 185, 129, 0.3);">99.4% Match</span>
+                </div>
+
+                <!-- PERSON CARD 2: Sarah -->
+                <div onclick="openPersonDetail('Sarah', 98, 'Friend', 'bg-gradient-to-tr from-sky-400 to-indigo-500')" class="glass-card group p-3.5 rounded-2xl flex flex-col items-center text-center cursor-pointer relative transition-all hover:scale-[1.03]">
+                  <div class="absolute top-2.5 right-2.5">
+                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Star/3D/star_3d.png" class="w-4 h-4 object-contain" alt="Starred">
+                  </div>
+                  <div class="w-24 h-24 rounded-full bg-gradient-to-tr from-sky-400 via-blue-500 to-indigo-600 p-1 shadow-md mb-2.5 group-hover:shadow-lg transition-shadow">
+                    <div class="w-full h-full rounded-full border-2 border-white bg-sky-200/50 flex items-center justify-center overflow-hidden">
+                      <span class="text-2xl font-bold text-white drop-shadow">S</span>
+                    </div>
+                  </div>
+                  <h4 class="text-xs font-bold truncate w-full" style="color: var(--text-main);">Sarah</h4>
+                  <p class="text-[10px] font-mono" style="color: var(--text-muted);">98 photos</p>
+                  <span class="mt-1.5 text-[9px] font-mono px-2 py-0.5 rounded-full border" style="background: var(--badge-neutral-bg); border-color: var(--badge-neutral-border); color: var(--text-secondary);">98.9% Match</span>
+                </div>
+
+                <!-- PERSON CARD 3: Marcus -->
+                <div onclick="openPersonDetail('Marcus', 84, 'Friend', 'bg-gradient-to-tr from-emerald-400 to-teal-600')" class="glass-card group p-3.5 rounded-2xl flex flex-col items-center text-center cursor-pointer relative transition-all hover:scale-[1.03]">
+                  <div class="absolute top-2.5 right-2.5">
+                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Star/3D/star_3d.png" class="w-4 h-4 object-contain" alt="Starred">
+                  </div>
+                  <div class="w-24 h-24 rounded-full bg-gradient-to-tr from-emerald-400 via-teal-500 to-cyan-600 p-1 shadow-md mb-2.5 group-hover:shadow-lg transition-shadow">
+                    <div class="w-full h-full rounded-full border-2 border-white bg-emerald-200/50 flex items-center justify-center overflow-hidden">
+                      <span class="text-2xl font-bold text-white drop-shadow">M</span>
+                    </div>
+                  </div>
+                  <h4 class="text-xs font-bold truncate w-full" style="color: var(--text-main);">Marcus</h4>
+                  <p class="text-[10px] font-mono" style="color: var(--text-muted);">84 photos</p>
+                  <span class="mt-1.5 text-[9px] font-mono px-2 py-0.5 rounded-full border" style="background: var(--badge-neutral-bg); border-color: var(--badge-neutral-border); color: var(--text-secondary);">99.1% Match</span>
+                </div>
+
+                <!-- PERSON CARD 4: Maya -->
+                <div onclick="openPersonDetail('Maya', 76, 'Partner', 'bg-gradient-to-tr from-pink-400 to-purple-600')" class="glass-card group p-3.5 rounded-2xl flex flex-col items-center text-center cursor-pointer relative transition-all hover:scale-[1.03]">
+                  <div class="absolute top-2.5 right-2.5">
+                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Star/3D/star_3d.png" class="w-4 h-4 object-contain" alt="Starred">
+                  </div>
+                  <div class="w-24 h-24 rounded-full bg-gradient-to-tr from-pink-400 via-fuchsia-500 to-purple-600 p-1 shadow-md mb-2.5 group-hover:shadow-lg transition-shadow">
+                    <div class="w-full h-full rounded-full border-2 border-white bg-pink-200/50 flex items-center justify-center overflow-hidden">
+                      <span class="text-2xl font-bold text-white drop-shadow">M</span>
+                    </div>
+                  </div>
+                  <h4 class="text-xs font-bold truncate w-full" style="color: var(--text-main);">Maya</h4>
+                  <p class="text-[10px] font-mono text-purple-600 font-semibold">76 photos</p>
+                  <span class="mt-1.5 text-[9px] font-mono px-2 py-0.5 rounded-full border" style="background: rgba(147, 51, 234, 0.1); color: #7e22ce; border-color: rgba(147, 51, 234, 0.3);">Partner Sharing</span>
+                </div>
+
+                <!-- PET CARD 1: Milo (Golden Retriever) -->
+                <div onclick="openPersonDetail('Milo (Dog)', 54, 'Pet', 'bg-gradient-to-tr from-amber-400 to-yellow-600')" class="glass-card group p-3.5 rounded-2xl flex flex-col items-center text-center cursor-pointer relative transition-all hover:scale-[1.03]">
+                  <div class="absolute top-2.5 right-2.5">
+                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Star/3D/star_3d.png" class="w-4 h-4 object-contain" alt="Starred">
+                  </div>
+                  <div class="w-24 h-24 rounded-full bg-gradient-to-tr from-amber-400 via-yellow-500 to-orange-500 p-1 shadow-md mb-2.5 group-hover:shadow-lg transition-shadow">
+                    <div class="w-full h-full rounded-full border-2 border-white bg-amber-100 flex items-center justify-center overflow-hidden">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Dog%20face/3D/dog_face_3d.png" class="w-12 h-12 object-contain" alt="Dog">
+                    </div>
+                  </div>
+                  <h4 class="text-xs font-bold truncate w-full" style="color: var(--text-main);">Milo (Dog)</h4>
+                  <p class="text-[10px] font-mono text-amber-600 font-semibold">54 photos</p>
+                  <span class="mt-1.5 text-[9px] font-mono px-2 py-0.5 rounded-full border" style="background: rgba(217, 119, 6, 0.1); color: #b45309; border-color: rgba(217, 119, 6, 0.3);">Golden Retriever</span>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- SECTION 3: OTHER PEOPLE & UNNAMED FACE CLUSTERS (APPLE PHOTOS STYLE) -->
+            <div>
+              <div class="flex items-center justify-between mb-3 px-1">
+                <div class="flex items-center gap-2">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Bust%20in%20silhouette/3D/bust_in_silhouette_3d.png" class="w-4 h-4 object-contain" alt="People">
+                  <h3 class="text-xs font-bold uppercase tracking-wider font-mono" style="color: var(--text-main);">Other People & Discovered Face Clusters</h3>
+                </div>
+                <span class="text-[11px] font-mono" style="color: var(--text-muted);">18 Tracked Groups</span>
+              </div>
+
+              <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                
+                <!-- Person 5: Kai -->
+                <div onclick="openPersonDetail('Kai', 42, 'Friend', 'bg-gradient-to-tr from-orange-400 to-amber-500')" class="glass-card group p-3.5 rounded-2xl flex flex-col items-center text-center cursor-pointer relative transition-all hover:scale-[1.03]">
+                  <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-orange-400 to-amber-500 p-0.5 shadow-sm mb-2 group-hover:shadow-md">
+                    <div class="w-full h-full rounded-full border-2 border-white bg-orange-100 flex items-center justify-center">
+                      <span class="text-lg font-bold text-white drop-shadow">K</span>
+                    </div>
+                  </div>
+                  <h4 class="text-xs font-bold truncate w-full" style="color: var(--text-main);">Kai</h4>
+                  <p class="text-[10px] font-mono" style="color: var(--text-muted);">42 photos</p>
+                </div>
+
+                <!-- Pet 2: Luna -->
+                <div onclick="openPersonDetail('Luna (Cat)', 38, 'Pet', 'bg-gradient-to-tr from-purple-400 to-pink-500')" class="glass-card group p-3.5 rounded-2xl flex flex-col items-center text-center cursor-pointer relative transition-all hover:scale-[1.03]">
+                  <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-purple-400 to-pink-500 p-0.5 shadow-sm mb-2 group-hover:shadow-md">
+                    <div class="w-full h-full rounded-full border-2 border-white bg-purple-100 flex items-center justify-center">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Cat%20face/3D/cat_face_3d.png" class="w-10 h-10 object-contain" alt="Cat">
+                    </div>
+                  </div>
+                  <h4 class="text-xs font-bold truncate w-full" style="color: var(--text-main);">Luna (Cat)</h4>
+                  <p class="text-[10px] font-mono text-purple-600 font-semibold">38 photos</p>
+                </div>
+
+                <!-- Unnamed Face Cluster #12 (Click to Name) -->
+                <div onclick="nameCluster('Cluster #12', 12)" class="glass-card group p-3.5 rounded-2xl flex flex-col items-center text-center cursor-pointer border-dashed border-2 relative transition-all hover:scale-[1.03]" style="border-color: rgba(99, 102, 241, 0.4);">
+                  <div class="w-20 h-20 rounded-full bg-slate-300 dark:bg-slate-700 p-0.5 shadow-sm mb-2 flex items-center justify-center">
+                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Bust%20in%20silhouette/3D/bust_in_silhouette_3d.png" class="w-10 h-10 object-contain opacity-60" alt="Unnamed">
+                  </div>
+                  <h4 class="text-xs font-bold text-indigo-600 truncate w-full">+ Add Name</h4>
+                  <p class="text-[10px] font-mono" style="color: var(--text-muted);">12 photos found</p>
+                </div>
+
+                <!-- Unnamed Face Cluster #15 (Click to Name) -->
+                <div onclick="nameCluster('Cluster #15', 7)" class="glass-card group p-3.5 rounded-2xl flex flex-col items-center text-center cursor-pointer border-dashed border-2 relative transition-all hover:scale-[1.03]" style="border-color: rgba(99, 102, 241, 0.4);">
+                  <div class="w-20 h-20 rounded-full bg-slate-300 dark:bg-slate-700 p-0.5 shadow-sm mb-2 flex items-center justify-center">
+                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Bust%20in%20silhouette/3D/bust_in_silhouette_3d.png" class="w-10 h-10 object-contain opacity-60" alt="Unnamed">
+                  </div>
+                  <h4 class="text-xs font-bold text-indigo-600 truncate w-full">+ Add Name</h4>
+                  <p class="text-[10px] font-mono" style="color: var(--text-muted);">7 photos found</p>
+                </div>
+
+                <!-- Unnamed Face Cluster #21 -->
+                <div onclick="nameCluster('Cluster #21', 5)" class="glass-card group p-3.5 rounded-2xl flex flex-col items-center text-center cursor-pointer border-dashed border-2 relative transition-all hover:scale-[1.03]" style="border-color: rgba(99, 102, 241, 0.4);">
+                  <div class="w-20 h-20 rounded-full bg-slate-300 dark:bg-slate-700 p-0.5 shadow-sm mb-2 flex items-center justify-center">
+                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Bust%20in%20silhouette/3D/bust_in_silhouette_3d.png" class="w-10 h-10 object-contain opacity-60" alt="Unnamed">
+                  </div>
+                  <h4 class="text-xs font-bold text-indigo-600 truncate w-full">+ Add Name</h4>
+                  <p class="text-[10px] font-mono" style="color: var(--text-muted);">5 photos found</p>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+        </div>
+
       </main>
 
       <!-- ======================================================================
-           LIVE INSPECTOR SIDEBAR (FOR TIMELINE & EXPLORER VIEWS)
+           LIVE INSPECTOR SIDEBAR (FOR TIMELINE, EXPLORER & PEOPLE VIEWS)
            ====================================================================== -->
       <aside id="timelineInspector" class="w-72 p-4 flex flex-col justify-between overflow-y-auto custom-scroll border-l shrink-0 select-none" style="background: var(--sidebar-bg); border-color: var(--sidebar-border);">
         <div class="space-y-4">
@@ -1714,22 +1965,25 @@
             </div>
           </div>
 
-          <!-- Neural Engine Insights -->
+          <!-- Neural Engine Insights & Detected Faces -->
           <div class="space-y-2">
-            <p class="text-[10px] font-semibold uppercase tracking-wider font-mono" style="color: var(--text-muted);">Vision & ANE</p>
+            <p class="text-[10px] font-semibold uppercase tracking-wider font-mono flex items-center justify-between" style="color: var(--text-muted);">
+              <span>Vision & Face Tracking</span>
+              <span class="text-emerald-600 font-bold">ANE 2.1ms</span>
+            </p>
             
             <div class="p-2.5 rounded-lg border text-xs font-mono space-y-1.5" style="background: var(--card-bg); border-color: var(--card-border);">
               <div class="flex justify-between">
-                <span style="color: var(--text-muted);">Inference Engine:</span>
-                <span class="text-emerald-600 font-bold">Apple Neural Engine</span>
+                <span style="color: var(--text-muted);">Detected Faces:</span>
+                <span class="text-purple-600 font-bold">Eleanor (99.4%)</span>
+              </div>
+              <div class="flex justify-between">
+                <span style="color: var(--text-muted);">Face Embedding:</span>
+                <span style="color: var(--text-main);">512-D CoreML Vector</span>
               </div>
               <div class="flex justify-between">
                 <span style="color: var(--text-muted);">Aesthetic Score:</span>
                 <span class="text-amber-500 font-bold">9.6 / 10</span>
-              </div>
-              <div class="flex justify-between">
-                <span style="color: var(--text-muted);">Face Detections:</span>
-                <span class="text-purple-600 font-semibold">Eleanor (99.4%)</span>
               </div>
               <div class="flex justify-between">
                 <span style="color: var(--text-muted);">Deduplication:</span>
@@ -1745,6 +1999,10 @@
           <button onclick="switchView('places')" class="w-full py-2 rounded-lg text-xs font-medium border flex items-center justify-center gap-2 transition-all cursor-pointer" style="background: var(--btn-ghost-bg); border-color: var(--btn-ghost-border); color: var(--btn-ghost-text);">
             <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/World%20map/3D/world_map_3d.png" class="w-3.5 h-3.5 object-contain" alt="Places">
             <span>Show on Places Map (⌘3)</span>
+          </button>
+          <button onclick="switchView('people')" class="w-full py-2 rounded-lg text-xs font-medium border flex items-center justify-center gap-2 transition-all cursor-pointer" style="background: var(--btn-ghost-bg); border-color: var(--btn-ghost-border); color: var(--btn-ghost-text);">
+            <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Busts%20in%20silhouette/3D/busts_in_silhouette_3d.png" class="w-3.5 h-3.5 object-contain" alt="People">
+            <span>Track People & Faces (⌘4)</span>
           </button>
           <button onclick="revealInFinder()" class="w-full py-2 rounded-lg text-xs font-medium border flex items-center justify-center gap-2 transition-all cursor-pointer" style="background: var(--btn-ghost-bg); border-color: var(--btn-ghost-border); color: var(--btn-ghost-text);">
             <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/File%20folder/3D/file_folder_3d.png" class="w-3.5 h-3.5 object-contain" alt="Finder">
@@ -1769,13 +2027,13 @@
           <span id="statusItemCount">1,824 items · 42.8 GB Local Vault</span>
         </span>
         <span class="hidden md:inline" style="color: var(--text-muted);">|</span>
-        <span class="hidden md:inline" style="color: var(--text-muted);">ANE CoreML Latency: 2.1ms/img</span>
+        <span class="hidden md:inline text-purple-600 font-semibold">23 People & Pets Tracked</span>
         <span class="hidden lg:inline" style="color: var(--text-muted);">|</span>
         <span class="hidden lg:inline text-indigo-500">36 Duplicate Groups in Utility</span>
       </div>
 
       <div class="flex items-center gap-3">
-        <span class="text-blue-500">P2P Wi-Fi Sync Active</span>
+        <span class="text-blue-500">P2P Wi-Fi Sync Active (Bottom Left)</span>
         <span style="color: var(--text-muted);">|</span>
         <span class="text-emerald-600 font-bold">Zero Cloud Egress</span>
       </div>
@@ -1792,6 +2050,7 @@
     let currentView = 'timeline';
     let currentCategory = 'all';
     let activeCardElement = null;
+    let showFaceBoxes = true;
 
     function initTheme() {
       const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -1844,28 +2103,32 @@
       }
     }
 
-    // View Switching: Timeline (Cmd+1), Explorer (Cmd+2), Places Map (Cmd+3)
+    // View Switching: Timeline (Cmd+1), Explorer (Cmd+2), Places Map (Cmd+3), People & Faces (Cmd+4)
     function switchView(mode) {
       currentView = mode;
       const vTimeline = document.getElementById('viewTimeline');
       const vExplorer = document.getElementById('viewExplorer');
       const vMap = document.getElementById('viewMap');
+      const vPeople = document.getElementById('viewPeople');
+
       const bTimeline = document.getElementById('btnTimelineMode');
       const bExplorer = document.getElementById('btnExplorerMode');
       const bPlaces = document.getElementById('btnPlacesMode');
+      const bPeople = document.getElementById('btnPeopleMode');
       const tInspector = document.getElementById('timelineInspector');
 
       // Hide all
       vTimeline.classList.add('hidden');
       vExplorer.classList.add('hidden');
       vMap.classList.add('hidden');
+      vPeople.classList.add('hidden');
 
-      bTimeline.classList.remove('active');
-      bTimeline.classList.add('inactive');
-      bExplorer.classList.remove('active');
-      bExplorer.classList.add('inactive');
-      bPlaces.classList.remove('active');
-      bPlaces.classList.add('inactive');
+      [bTimeline, bExplorer, bPlaces, bPeople].forEach(b => {
+        if (b) {
+          b.classList.remove('active');
+          b.classList.add('inactive');
+        }
+      });
 
       if (mode === 'timeline') {
         vTimeline.classList.remove('hidden');
@@ -1881,7 +2144,12 @@
         vMap.classList.remove('hidden');
         bPlaces.classList.add('active');
         bPlaces.classList.remove('inactive');
-        tInspector.classList.add('hidden'); // Places map has its own dedicated rich inspector!
+        tInspector.classList.add('hidden'); // Places map has dedicated full-width inspector
+      } else if (mode === 'people') {
+        vPeople.classList.remove('hidden');
+        bPeople.classList.add('active');
+        bPeople.classList.remove('inactive');
+        tInspector.classList.remove('hidden');
       }
     }
 
@@ -1924,6 +2192,8 @@
           matches = itemCat === 'pets' || itemTags.includes('pet') || itemTags.includes('dog') || itemTags.includes('cat');
         } else if (category === 'travel') {
           matches = itemCat === 'travel' || itemTags.includes('travel');
+        } else if (category === 'people') {
+          matches = itemTags.includes('eleanor') || itemTags.includes('sarah') || itemTags.includes('marcus') || itemTags.includes('maya');
         } else if (category === 'screenshots') {
           matches = itemCat === 'screenshots' || itemTags.includes('screenshot');
         } else if (category === 'documents') {
@@ -1945,13 +2215,50 @@
       document.getElementById('statusItemCount').textContent = `${visibleCount} items visible · Filter: ${category}`;
     }
 
+    // Toggle Face Bounding Boxes
+    function toggleFaceBoxes() {
+      showFaceBoxes = !showFaceBoxes;
+      document.querySelectorAll('.face-box-overlay').forEach(box => {
+        box.style.display = showFaceBoxes ? 'flex' : 'none';
+      });
+      const lbl = document.getElementById('faceBoxLabel');
+      if (lbl) {
+        lbl.textContent = showFaceBoxes ? 'Face Focus Boxes: ON' : 'Face Focus Boxes: OFF';
+      }
+    }
+
+    // Open Person Face Detail Album (Apple Photos Style)
+    function openPersonDetail(name, count, role, gradientClass) {
+      switchView('timeline');
+      filterPerson(name);
+      alert(`Opened Person Album for ${name}:\n• ${count} recognized photos collected\n• Category: ${role}\n• Local Vision Embeddings: Calibrated\n• Face tracking bounding boxes active`);
+    }
+
+    function confirmAllCandidateFaces() {
+      alert('Confirmed all 18 candidate faces for Eleanor!\nApple Vision CoreML embeddings updated in local SQLite store.');
+    }
+
+    function promptAddPerson() {
+      const name = prompt('Enter name for the new face cluster:');
+      if (name) {
+        alert(`Person "${name}" added to People & Pets. Neural Gallery will cluster and track all future photos of ${name}.`);
+      }
+    }
+
+    function nameCluster(clusterId, count) {
+      const name = prompt(`Enter name for ${clusterId} (${count} photos):`);
+      if (name) {
+        alert(`Renamed ${clusterId} to "${name}". All ${count} photos are now linked to ${name}.`);
+      }
+    }
+
     // Person & Pet Face Filter
     function filterPerson(name) {
       const cards = document.querySelectorAll('.photo-card');
       let count = 0;
       cards.forEach(card => {
         const tags = (card.getAttribute('data-tags') || '').toLowerCase();
-        if (name === 'all' || tags.includes(name.toLowerCase())) {
+        if (name === 'all' || tags.includes(name.toLowerCase().split(' ')[0])) {
           card.classList.remove('hidden');
           count++;
         } else {
@@ -2027,7 +2334,7 @@
       if (newFav) {
         if (!favIcon) {
           const div = document.createElement('div');
-          div.className = 'absolute top-2 right-2';
+          div.className = 'absolute top-2 right-2 z-20';
           div.innerHTML = '<img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Red%20heart/3D/red_heart_3d.png" class="w-4 h-4 object-contain drop-shadow" alt="Favorited">';
           activeCardElement.appendChild(div);
         }
@@ -2115,7 +2422,7 @@
       });
 
       document.getElementById('statusItemCount').textContent = q 
-        ? `MobileCLIP Semantic Query "${q}": ${visible} matching results (ANE 2.1ms)` 
+        ? `MobileCLIP Semantic Query "${q}": ${visible} matching results` 
         : `${visible} items in Local Vault`;
     }
 
@@ -2130,6 +2437,9 @@
       } else if (e.metaKey && e.key === '3') {
         e.preventDefault();
         switchView('places');
+      } else if (e.metaKey && e.key === '4') {
+        e.preventDefault();
+        switchView('people');
       } else if (e.metaKey && e.key === 'l') {
         e.preventDefault();
         lockVault();
