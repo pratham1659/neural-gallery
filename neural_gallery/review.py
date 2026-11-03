@@ -1551,7 +1551,7 @@ def _thumbnail(path: Path, edge: int = 1600) -> bytes:
 
 
 def serve(db_path: Path, port: int = 8765) -> None:
-    server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(db_path))
+    server = ThreadingHTTPServer(("0.0.0.0", port), make_handler(db_path))
     print(f"Neural Gallery review at http://127.0.0.1:{port}", flush=True)
     try:
         server.serve_forever()
