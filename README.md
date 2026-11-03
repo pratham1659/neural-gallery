@@ -34,6 +34,22 @@ Neural Gallery indexes media stored on your Mac, performs on-device face & pet r
 
 ---
 
+## Architecture & Native Acceleration
+
+Neural Gallery utilizes a hybrid high-performance architecture:
+* **Native Swift Dynamic Library (`libneural_bridge.dylib`):** Direct C-ABI bridge exposing macOS `Vision.framework` (`VNDetectFaceRectanglesRequest`, `VNRecognizeAnimalsRequest`, `VNRecognizeTextRequest`), Core ML MobileCLIP image/text embeddings, and `LocalAuthentication.framework` (Touch ID / Face ID hardware validation).
+* **Python Engine & CLI:** Orchestrates file discovery, metadata parsing, perceptual hash clustering, SQLite storage, and serves the REST API.
+* **Tauri 2.0 & High-Performance UI:** Provides hardware-accelerated rendering and encrypted vault filesystem access.
+
+### Compiling the Native Swift Bridge
+
+```bash
+# Build libneural_bridge.dylib for Apple Silicon
+./native/build.sh
+```
+
+---
+
 ## Quickstart
 
 ### Requirements
