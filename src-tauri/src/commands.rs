@@ -3,6 +3,7 @@ use crate::bridge::swift::{
     extract_ocr, AnimalBox, FaceBox,
 };
 use crate::state::{VaultManager, VaultStatus};
+use crate::sync::{PeerDevice, SyncMeshManager, SyncStatus};
 use std::fs;
 use std::path::Path;
 use tauri::State;
@@ -100,4 +101,25 @@ pub fn vault_embed_text(query: String) -> Result<Vec<f32>, String> {
     embed_text(&query)
         .map(|arr| arr.to_vec())
         .ok_or_else(|| "Failed to generate text embedding".to_string())
+}
+
+#[tauri::command]
+pub fn sync_status(sync_mgr: State<'_, SyncMeshManager>) -> Result<SyncStatus, String> {
+    Ok(sync_mgr.status())
+}
+
+#[tauri::command]
+pub fn sync_pair(
+    device_id: String,
+    pin: String,
+    name: Option<String>,
+    model: Option<String>,
+    sync_mgr: State<'_, SyncMeshManager>,
+) -> Result<PeerDevice, String> {
+    sync_mgr.pair(device_id, pin, name, model)
+}
+
+#[tauri::command]
+pub fn sync_rotate_pin(sync_mgr: State<'_, SyncMeshManager>) -> Result<String, String> {
+    Ok(sync_mgr.rotate_pin())
 }
