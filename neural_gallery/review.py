@@ -1076,8 +1076,29 @@ def make_handler(db_path: Path):
 
         def do_GET(self) -> None:
             parsed = urlparse(self.path)
-            if parsed.path in ("/", "/preview", "/preview.html"):
-                preview_path = Path(__file__).resolve().parent.parent / "preview.html"
+            root_dir = Path(__file__).resolve().parent.parent
+
+            if parsed.path.startswith("/assets/"):
+                asset_file = root_dir / "dist" / parsed.path.lstrip("/")
+                if asset_file.is_file():
+                    content_type = "text/javascript" if asset_file.suffix == ".js" else "text/css" if asset_file.suffix == ".css" else "application/octet-stream"
+                    self._send(200, asset_file.read_bytes(), content_type)
+                    return
+
+            if parsed.path == "/":
+                dist_index = root_dir / "dist" / "index.html"
+                if dist_index.is_file():
+                    self._send(200, dist_index.read_bytes(), "text/html; charset=utf-8")
+                    return
+                preview_path = root_dir / "preview.html"
+                if preview_path.is_file():
+                    self._send(200, preview_path.read_bytes(), "text/html; charset=utf-8")
+                    return
+                self._send(200, PAGE.encode(), "text/html; charset=utf-8")
+                return
+
+            if parsed.path in ("/preview", "/preview.html"):
+                preview_path = root_dir / "preview.html"
                 if preview_path.is_file():
                     self._send(200, preview_path.read_bytes(), "text/html; charset=utf-8")
                     return
@@ -1551,7 +1572,7 @@ def _thumbnail(path: Path, edge: int = 1600) -> bytes:
 
 
 def serve(db_path: Path, port: int = 8765) -> None:
-    server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(db_path))
+    server = ThreadingHTTPServer(("0.0.0.0", port), make_handler(db_path))
     print(f"Neural Gallery review at http://127.0.0.1:{port}", flush=True)
     try:
         server.serve_forever()

@@ -4,10 +4,10 @@
   "version": "0.1.0",
   "identifier": "com.neuralgallery.app",
   "build": {
-    "beforeDevCommand": "",
-    "beforeBuildCommand": "",
-    "devUrl": "http://127.0.0.1:8765",
-    "frontendDist": "../"
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist"
   },
   "app": {
     "windows": [

@@ -15,6 +15,9 @@ src-tauri/target/
 # Node & Frontend
 node_modules/
 .npm/
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
 
 # Local Databases & Journals
 *.sqlite-wal

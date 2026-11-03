@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root, .theme-light {
+  --canvas-bg: #ece9e2;
+  --text-main: #1c1917;
+  --text-secondary: #57534e;
+  --text-muted: #8c857b;
+  --text-faint: #a8a29e;
+  
+  --window-bg: rgba(255, 255, 255, 0.76);
+  --glass-sidebar: rgba(246, 243, 237, 0.82);
+  --glass-panel: rgba(255, 255, 255, 0.88);
+  --glass-card: rgba(255, 255, 255, 0.92);
+  --glass-card-hover: rgba(255, 255, 255, 1);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-border-light: rgba(0, 0, 0, 0.05);
+  --glass-border-hover: rgba(0, 0, 0, 0.16);
+  
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-glow: rgba(37, 99, 235, 0.25);
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  
+  --button-bg: rgba(255, 255, 255, 0.85);
+  --button-border: rgba(0, 0, 0, 0.1);
+  --button-hover: rgba(0, 0, 0, 0.04);
+  --button-active: rgba(0, 0, 0, 0.08);
+  
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 8px 24px -4px rgba(0, 0, 0, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 20px 32px -8px rgba(0, 0, 0, 0.12), 0 8px 16px -4px rgba(0, 0, 0, 0.06);
+}
+
+.theme-dark {
+  --canvas-bg: #0d1117;
+  --text-main: #f0f6fc;
+  --text-secondary: #c9d1d9;
+  --text-muted: #8b949e;
+  --text-faint: #484f58;
+  
+  --window-bg: rgba(13, 17, 23, 0.82);
+  --glass-sidebar: rgba(22, 27, 34, 0.88);
+  --glass-panel: rgba(22, 27, 34, 0.92);
+  --glass-card: rgba(22, 27, 34, 0.94);
+  --glass-card-hover: rgba(33, 38, 45, 0.98);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-border-light: rgba(255, 255, 255, 0.06);
+  --glass-border-hover: rgba(255, 255, 255, 0.2);
+  
+  --accent: #58a6ff;
+  --accent-hover: #79c0ff;
+  --accent-glow: rgba(88, 166, 255, 0.35);
+  --accent-soft: rgba(88, 166, 255, 0.12);
+  
+  --button-bg: rgba(33, 38, 45, 0.85);
+  --button-border: rgba(255, 255, 255, 0.12);
+  --button-hover: rgba(255, 255, 255, 0.06);
+  --button-active: rgba(255, 255, 255, 0.12);
+  
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px -4px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 20px 32px -8px rgba(0, 0, 0, 0.65);
+}
+
+body {
+  background-color: var(--canvas-bg);
+  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--glass-border);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+}

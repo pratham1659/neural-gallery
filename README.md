@@ -55,6 +55,19 @@ Neural Gallery utilizes a hybrid high-performance architecture:
 cd src-tauri && cargo test
 ```
 
+### React 19 + TypeScript + Vite Desktop Frontend
+
+```bash
+# Install dependencies
+npm install
+
+# Start Vite live development server (HMR on port 1420)
+npm run dev
+
+# Build production bundle
+npm run build
+```
+
 ---
 
 ## Quickstart

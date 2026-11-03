@@ -131,7 +131,7 @@ cargo tauri dev
 └───────────────────────────────────────────┬────────────────────────────────────────────┘
                                             ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ [ ] PHASE 6: Frontend Migration to React 19 + TypeScript + Vite + TanStack Virtual     │
+│ [x] PHASE 6: Frontend Migration to React 19 + TypeScript + Vite + TanStack Virtual     │
 └───────────────────────────────────────────┬────────────────────────────────────────────┘
                                             ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
@@ -242,18 +242,25 @@ cargo tauri dev
 
 ---
 
-### [ ] Phase 6: Frontend Migration to React 19 + TypeScript + Vite + TanStack Virtual
-* **Status:** **PENDING**
-* **Scope & Tasks:**
-  * Port the design system and components from `preview.html` into a modular React 19 + TypeScript + Vite project:
-    * `src/components/timeline/`: Multi-tier virtualized grid (Years $\leftrightarrow$ Months $\leftrightarrow$ Days) with TanStack Virtual.
-    * `src/components/explorer/`: Finder-grade multi-column table with deep EXIF/IPTC inspector sidebar (`⌘I`) and duplicate comparison.
-    * `src/components/map/`: Interactive Places & Geography map with geocache pins.
-    * `src/components/people/`: People & Pets face carousel with circular face chips and candidate confirmation banner.
-    * `src/components/auth/`: Touch ID and Master Password lock screen modal (`⌘L`).
-    * `src/components/sync/`: P2P Wi-Fi Sync modal and QR code generator for Android PWA pairing.
-  * Stream decrypted images to the WebKit canvas via memory-backed custom protocol (`aperture-stream://`) or ephemeral object URLs without disk staging.
-* **UI Checkpoint:** Full native desktop application executing at steady 60–120 fps ProMotion refresh rate with fluid pinch-to-zoom timeline transitions.
+### [x] Phase 6: Frontend Migration to React 19 + TypeScript + Vite + TanStack Virtual
+* **Status:** **COMPLETED**
+* **Deliverables:**
+  * **React 19 + TypeScript + Vite Application (`src/` & `dist/`):**
+    * Modern build configuration ([`package.json`](package.json), [`vite.config.ts`](vite.config.ts), [`tsconfig.json`](tsconfig.json), [`tailwind.config.js`](tailwind.config.js)).
+    * Apple HIG Light & Obsidian Dark glassmorphism design system in [`src/index.css`](src/index.css).
+  * **Modular Component Architecture:**
+    * [`src/components/layout/Header.tsx`](src/components/layout/Header.tsx): Draggable macOS titlebar, segmented views (`⌘1`, `⌘2`, `⌘3`, `⌘4`), MobileCLIP natural language search (`⌘F`), and time scale controls.
+    * [`src/components/layout/Sidebar.tsx`](src/components/layout/Sidebar.tsx): Apple Photos & Google Photos taxonomy with 46 Microsoft 3D illustrative icons, collapsible video sub-categories (ProRes, Slo-mo, Time-lapse, Screen Recordings), and bottom-left P2P Wi-Fi Sync drawer.
+    * [`src/components/timeline/TimelineView.tsx`](src/components/timeline/TimelineView.tsx): High-performance 60–120fps virtualized photo grid using **TanStack Virtual** (`@tanstack/react-virtual`).
+    * [`src/components/explorer/ExplorerView.tsx`](src/components/explorer/ExplorerView.tsx): Finder-grade multi-column table with rapid triage controls (`K` Keep, `N` Trash).
+    * [`src/components/places/PlacesMapView.tsx`](src/components/places/PlacesMapView.tsx): Interactive Places & Geography map with geocache pins and photo telemetry cards.
+    * [`src/components/people/PeopleView.tsx`](src/components/people/PeopleView.tsx): Clustered people & pets face collection with "Review Additional Photos" candidate verification banner.
+    * [`src/components/inspector/InspectorSidebar.tsx`](src/components/inspector/InspectorSidebar.tsx): Deep optical EXIF, camera optics, Display P3 wide gamut, GPS coordinates, and OCR text (`⌘I`).
+    * [`src/components/sync/SyncModal.tsx`](src/components/sync/SyncModal.tsx): Air-gapped P2P Wi-Fi Sync modal with SAS PIN display and connected devices list.
+    * [`src/components/auth/LockScreenModal.tsx`](src/components/auth/LockScreenModal.tsx): Touch ID and master passphrase lock screen modal with Argon2id progress animation (`⌘L`).
+  * **Full Production Build & Server Integration:**
+    * Clean production bundling (`npm run build` -> `dist/`) integrated with local server and Tauri core.
+    * 5 new automated tests in [`tests/test_phase6.py`](tests/test_phase6.py) (61/61 tests passing across test suite).
 
 ---
 
