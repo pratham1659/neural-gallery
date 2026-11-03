@@ -48,6 +48,13 @@ Neural Gallery utilizes a hybrid high-performance architecture:
 ./native/build.sh
 ```
 
+### Tauri 2.0 Core & Cryptographic Engine
+
+```bash
+# Run Rust unit tests for Argon2id KDF, EVFS AES-256-GCM, and memory guard
+cd src-tauri && cargo test
+```
+
 ---
 
 ## Quickstart
