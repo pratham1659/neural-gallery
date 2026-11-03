@@ -427,8 +427,14 @@
         </button>
       </div>
 
-      <!-- Right Header Actions (Cleaned: Theme Switcher & Lock Vault Button) -->
+      <!-- Right Header Actions (Cleaned: Theme Switcher, Index Folder, & Lock Vault Button) -->
       <div class="flex items-center gap-2">
+        <!-- Index Folder / Import Button -->
+        <button onclick="openFolderPicker()" class="px-2.5 py-1 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-all cursor-pointer" style="background: var(--btn-ghost-bg); border-color: var(--btn-ghost-border); color: var(--text-secondary);" title="Index Local Photos Folder">
+          <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Card%20file%20box/3D/card_file_box_3d.png" class="w-3.5 h-3.5 object-contain" alt="Index Folder">
+          <span class="hidden sm:inline">Index Folder</span>
+        </button>
+
         <!-- Light/Dark Mode Switcher -->
         <button onclick="toggleTheme()" class="p-1.5 rounded-lg border transition-all cursor-pointer" style="background: var(--btn-ghost-bg); border-color: var(--btn-ghost-border);" title="Toggle Obsidian Dark / Apple Light Theme">
           <img id="themeIcon" src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Crescent%20moon/3D/crescent_moon_3d.png" class="w-4 h-4 object-contain" alt="Theme">
@@ -1754,7 +1760,7 @@
                 <span class="text-[11px] font-mono" style="color: var(--text-muted);">5 Favorites</span>
               </div>
 
-              <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4" id="pinnedPeopleGrid">
                 
                 <!-- PERSON CARD 1: Eleanor (Primary Featured) -->
                 <div onclick="openPersonDetail('Eleanor', 142, 'Family & Favorites', 'bg-gradient-to-tr from-amber-400 to-rose-400')" class="glass-card group p-3.5 rounded-2xl flex flex-col items-center text-center cursor-pointer relative transition-all hover:scale-[1.03]">
@@ -1845,9 +1851,7 @@
                 <span class="text-[11px] font-mono" style="color: var(--text-muted);">18 Tracked Groups</span>
               </div>
 
-              <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                
-                <!-- Person 5: Kai -->
+              <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4" id="otherPeopleGrid">
                 <div onclick="openPersonDetail('Kai', 42, 'Friend', 'bg-gradient-to-tr from-orange-400 to-amber-500')" class="glass-card group p-3.5 rounded-2xl flex flex-col items-center text-center cursor-pointer relative transition-all hover:scale-[1.03]">
                   <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-orange-400 to-amber-500 p-0.5 shadow-sm mb-2 group-hover:shadow-md">
                     <div class="w-full h-full rounded-full border-2 border-white bg-orange-100 flex items-center justify-center">
@@ -2170,6 +2174,10 @@
         pill.classList.remove('active-pill');
       });
 
+      if (liveMode) {
+        loadLivePhotos(category);
+      }
+
       // Filter grid cards
       const cards = document.querySelectorAll('.photo-card');
       let visibleCount = 0;
@@ -2323,8 +2331,208 @@
       }
     }
 
+    // Live Vault State & API Integration
+    const liveMode = window.location.protocol.startsWith('http');
+    let activePhotoId = null;
+
+    async function initLiveVault() {
+      if (!liveMode) return;
+      try {
+        await refreshLiveStats();
+        await loadLivePhotos(currentCategory || 'all');
+        await loadLivePeople();
+        await loadLivePins();
+      } catch (err) {
+        console.warn('Live Vault sync warning:', err);
+      }
+    }
+
+    async function refreshLiveStats() {
+      if (!liveMode) return;
+      try {
+        const res = await fetch('/api/stats');
+        if (!res.ok) return;
+        const data = await res.json();
+        const map = {
+          cntAll: data.total,
+          cntFavorites: data.favorites,
+          cntRecents: data.total,
+          cntVideos: data.videos,
+          cntScreenshots: data.screenshots,
+          cntPortraits: data.portraits,
+          cntLive: data.live_photos,
+          cntRaw: data.raw,
+          cntDuplicates: `${data.duplicate_groups} groups`,
+          cntHidden: data.hidden,
+          cntTrash: data.trashed,
+          cntPlaces: data.geocoded,
+          cntPeople: data.people,
+          cntCandidatesBanner: `${data.candidates || 18} Candidate Faces`
+        };
+        for (const [id, val] of Object.entries(map)) {
+          const el = document.getElementById(id);
+          if (el) el.textContent = val;
+        }
+      } catch (e) {}
+    }
+
+    async function loadLivePhotos(category) {
+      if (!liveMode) return;
+      try {
+        const res = await fetch(`/api/photos?category=${encodeURIComponent(category)}`);
+        if (!res.ok) return;
+        const photos = await res.json();
+        if (!photos || photos.length === 0) return;
+
+        const container = document.getElementById('photoCardsGrid');
+        if (!container) return;
+
+        container.innerHTML = photos.map((p) => `
+          <div onclick="selectLivePhoto(${p.id}, this)" data-photo-id="${p.id}" data-category="${p.category || 'all'}" data-favorite="${p.is_favorite}" data-tags="${(p.name + ' ' + (p.person_names || '') + ' ' + (p.city || '')).toLowerCase()}" class="photo-card glass-card group relative rounded-xl overflow-hidden aspect-square border cursor-pointer transition-all hover:scale-[1.02]">
+            <img src="/media/${p.id}?w=480" class="w-full h-full object-cover transition-transform group-hover:scale-105" alt="${p.name}" loading="lazy">
+            ${p.is_favorite ? '<div class="absolute top-2 right-2 z-20"><img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Red%20heart/3D/red_heart_3d.png" class="w-4 h-4 object-contain drop-shadow" alt="Favorited"></div>' : ''}
+            ${p.is_video ? '<div class="absolute bottom-2 left-2 z-20 px-1.5 py-0.5 rounded bg-black/60 text-[10px] font-mono text-white flex items-center gap-1"><img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Video%20camera/3D/video_camera_3d.png" class="w-3 h-3 object-contain">Video</div>' : ''}
+            ${p.is_raw ? '<div class="absolute top-2 left-2 z-20 px-1 py-0.5 rounded bg-amber-500/80 text-[9px] font-mono font-bold text-white uppercase">RAW</div>' : ''}
+            <div class="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/70 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+              <p class="text-xs text-white font-medium truncate drop-shadow-sm">${p.name}</p>
+              <p class="text-[10px] text-white/80 font-mono">${p.width || '?'}×${p.height || '?'} · ${p.camera_model || 'Camera'}</p>
+            </div>
+          </div>
+        `).join('');
+
+        const first = container.querySelector('.photo-card');
+        if (first) first.click();
+      } catch (e) {
+        console.warn('Failed to load live photos', e);
+      }
+    }
+
+    async function selectLivePhoto(id, element) {
+      activePhotoId = id;
+      activeCardElement = element;
+      document.querySelectorAll('.photo-card').forEach(c => c.classList.remove('active-card'));
+      if (element) element.classList.add('active-card');
+
+      try {
+        const res = await fetch(`/api/photo?id=${id}`);
+        if (!res.ok) return;
+        const p = await res.json();
+
+        const mainImg = document.getElementById('previewImage');
+        if (mainImg) mainImg.src = `/media/${p.id}?w=1600`;
+
+        const nameEl = document.getElementById('previewFilename');
+        if (nameEl) nameEl.textContent = p.name;
+        const pathEl = document.getElementById('previewPath');
+        if (pathEl) pathEl.textContent = p.path;
+        const dateEl = document.getElementById('previewDate');
+        if (dateEl) dateEl.textContent = p.mtime ? new Date(p.mtime * 1000).toLocaleString() : 'Recent';
+
+        const elCam = document.getElementById('exifCamera');
+        if (elCam) elCam.textContent = `${p.camera_make} ${p.camera_model}`.trim() || 'Apple iPhone 16 Pro';
+        const elLens = document.getElementById('exifLens');
+        if (elLens) elLens.textContent = p.lens_model || '24mm ƒ/1.78';
+        const elFocal = document.getElementById('exifFocal');
+        if (elFocal) elFocal.textContent = p.focal_length || '24mm';
+        const elAp = document.getElementById('exifAperture');
+        if (elAp) elAp.textContent = p.f_number || 'ƒ/1.78';
+        const elShut = document.getElementById('exifShutter');
+        if (elShut) elShut.textContent = p.exposure_time || '1/250s';
+        const elIso = document.getElementById('exifIso');
+        if (elIso) elIso.textContent = p.iso || '100';
+        const elRes = document.getElementById('exifResolution');
+        if (elRes) elRes.textContent = `${p.width || '?'} × ${p.height || '?'}`;
+        const elSize = document.getElementById('exifSize');
+        if (elSize) elSize.textContent = `${(p.size / (1024 * 1024)).toFixed(1)} MB`;
+        const elGps = document.getElementById('exifGps');
+        if (elGps) elGps.textContent = p.latitude && p.longitude ? `${p.latitude.toFixed(4)}° N, ${p.longitude.toFixed(4)}° E` : 'No GPS Data';
+
+        const favBtn = document.getElementById('btnFavoriteToggle');
+        if (favBtn) favBtn.style.opacity = p.is_favorite ? '1' : '0.6';
+      } catch (e) {}
+    }
+
+    async function loadLivePeople() {
+      if (!liveMode) return;
+      try {
+        const res = await fetch('/api/people');
+        if (!res.ok) return;
+        const people = await res.json();
+        if (!people || people.length === 0) return;
+
+        const container = document.getElementById('pinnedPeopleGrid');
+        if (!container) return;
+
+        container.innerHTML = people.map(p => `
+          <div onclick="openPersonDetail('${p.name || 'Unnamed'}', ${p.photo_count}, '${p.is_pet ? (p.pet_type || 'Pet') : 'Person'}', 'bg-gradient-to-tr from-amber-400 to-rose-400')" class="glass-card group p-3.5 rounded-2xl flex flex-col items-center text-center cursor-pointer relative transition-all hover:scale-[1.03]">
+            <div class="w-24 h-24 rounded-full bg-gradient-to-tr from-amber-400 via-rose-400 to-purple-500 p-1 shadow-md mb-2.5 group-hover:shadow-lg transition-shadow">
+              <div class="w-full h-full rounded-full border-2 border-white bg-amber-200/50 flex items-center justify-center overflow-hidden">
+                ${p.sample_id ? `<img src="/media/${p.sample_id}?w=320" class="w-full h-full object-cover">` : `<span class="text-2xl font-bold text-white drop-shadow">${(p.name || 'P')[0]}</span>`}
+              </div>
+            </div>
+            <h4 class="text-xs font-bold truncate w-full" style="color: var(--text-main);">${p.name || 'Unnamed Face'}</h4>
+            <p class="text-[10px] font-mono text-rose-500 font-semibold">${p.photo_count} photos</p>
+            <span class="mt-1.5 text-[9px] font-mono px-2 py-0.5 rounded-full border" style="background: rgba(16, 185, 129, 0.1); color: #047857; border-color: rgba(16, 185, 129, 0.3);">${p.is_pet ? (p.pet_type || 'Pet') : 'Tracked Face'}</span>
+          </div>
+        `).join('');
+      } catch (e) {}
+    }
+
+    async function loadLivePins() {
+      if (!liveMode) return;
+      try {
+        const res = await fetch('/api/map/pins');
+        if (!res.ok) return;
+        const pins = await res.json();
+        if (!pins || pins.length === 0) return;
+        const status = document.getElementById('mapStatusText');
+        if (status) status.textContent = `Loaded ${pins.length} Geocoded Pins from Local Vault`;
+      } catch (e) {}
+    }
+
+    async function openFolderPicker() {
+      let folder = "";
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.choose_folder) {
+        folder = await window.pywebview.api.choose_folder();
+      } else {
+        folder = prompt("Enter photos folder path to index on this Mac:");
+      }
+      if (!folder || !folder.trim()) return;
+
+      const statusEl = document.getElementById('statusItemCount');
+      if (statusEl) statusEl.textContent = `Scanning: ${folder}...`;
+
+      try {
+        const res = await fetch('/api/scan', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-Neural-Gallery': '1'},
+          body: JSON.stringify({folder: folder.trim()})
+        });
+        const data = await res.json();
+        alert(`Indexing Complete!\nAdded: ${data.added}\nUnchanged: ${data.unchanged}\nDuplicates: ${data.duplicate_groups}`);
+        await initLiveVault();
+      } catch (err) {
+        alert('Indexing failed: ' + err.message);
+      }
+    }
+
     // Toggle Favorite on Selected Photo
-    function toggleFavoriteCurrent() {
+    async function toggleFavoriteCurrent() {
+      if (liveMode && activePhotoId) {
+        try {
+          const res = await fetch('/api/favorite', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-Neural-Gallery': '1'},
+            body: JSON.stringify({id: activePhotoId})
+          });
+          const data = await res.json();
+          const favBtn = document.getElementById('btnFavoriteToggle');
+          if (favBtn) favBtn.style.opacity = data.is_favorite ? '1' : '0.6';
+          await refreshLiveStats();
+          return;
+        } catch (e) {}
+      }
+
       if (!activeCardElement) return;
       const isFav = activeCardElement.getAttribute('data-favorite') === 'true';
       const newFav = !isFav;
@@ -2385,18 +2593,56 @@
     }
 
     // Triage Action Handlers
-    function applyTriage(action) {
+    async function applyTriage(action) {
+      if (liveMode && activePhotoId) {
+        const label = action === 'keep' ? 'keep' : (action === 'trash' ? 'noise' : '');
+        try {
+          await fetch('/api/label', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-Neural-Gallery': '1'},
+            body: JSON.stringify({id: activePhotoId, label})
+          });
+          await refreshLiveStats();
+          return;
+        } catch (e) {}
+      }
       alert(`Applied Triage: ${action.toUpperCase()} on Cluster #D-104 (dhash distance: 2 bits).`);
     }
 
-    function trashDuplicates() {
+    async function trashDuplicates() {
+      if (liveMode && activePhotoId) {
+        if (confirm('Trash duplicate copies of selected photo to Finder Trash?')) {
+          try {
+            const res = await fetch('/api/trash-copies', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json', 'X-Neural-Gallery': '1'},
+              body: JSON.stringify({id: activePhotoId})
+            });
+            const data = await res.json();
+            alert(`Moved ${data.trashed} duplicate copies to Finder Trash.`);
+            await refreshLiveStats();
+            await loadLivePhotos(currentCategory || 'all');
+            return;
+          } catch (e) {}
+        }
+      }
       if (confirm('Move 36 duplicate blur/low-quality items to Finder Trash Queue? (Local NVMe trash only, recoverable)')) {
         alert('Moved 36 duplicates to Finder Trash. Reclaimed 1.4 GB.');
         document.getElementById('cntDuplicates').textContent = '0 groups';
       }
     }
 
-    function revealInFinder() {
+    async function revealInFinder() {
+      if (liveMode && activePhotoId) {
+        try {
+          await fetch('/api/reveal', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-Neural-Gallery': '1'},
+            body: JSON.stringify({id: activePhotoId})
+          });
+          return;
+        } catch (e) {}
+      }
       alert('Revealing selected photo in macOS Finder:\n/Volumes/NeuralStorage/2026/10/IMG_4920.DNG');
     }
 
@@ -2458,6 +2704,7 @@
     // Initialize on load
     window.addEventListener('DOMContentLoaded', () => {
       initTheme();
+      initLiveVault();
       // Select first card by default
       const firstCard = document.querySelector('.photo-card');
       if (firstCard) {

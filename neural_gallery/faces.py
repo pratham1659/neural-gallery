@@ -353,3 +353,52 @@ def name_person(connection: sqlite3.Connection, person_key: str, name: str, is_p
         )
     else:
         connection.execute("DELETE FROM people WHERE person_key = ?", (person_key,))
+
+
+def list_candidates(connection: sqlite3.Connection, limit: int = 24) -> list[dict]:
+    """Find candidate face detections that are either in unnamed clusters or need user confirmation."""
+    rows = connection.execute(
+        """
+        SELECT faces.id, faces.file_id, faces.x, faces.y, faces.w, faces.h, faces.confidence,
+               faces.person_key, files.path
+        FROM faces
+        JOIN files ON files.id = faces.file_id
+        LEFT JOIN people ON people.person_key = faces.person_key
+        WHERE (people.name IS NULL OR people.name = '')
+        ORDER BY faces.confidence DESC, faces.id DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+    return [
+        {
+            "face_id": row["id"],
+            "file_id": row["file_id"],
+            "path": row["path"],
+            "name": Path(row["path"]).name,
+            "box": [row["x"], row["y"], row["w"], row["h"]],
+            "confidence": row["confidence"],
+            "person_key": row["person_key"] or f"p{row['id']}",
+        }
+        for row in rows
+    ]
+
+
+def confirm_candidate(connection: sqlite3.Connection, face_id: int, person_key: str) -> None:
+    """Confirm a candidate face into a person group."""
+    if not person_key or not person_key.startswith("p"):
+        raise ValueError("invalid person key")
+    connection.execute("UPDATE faces SET person_key = ? WHERE id = ?", (person_key, face_id))
+    connection.commit()
+
+
+def merge_people(connection: sqlite3.Connection, source_person_key: str, target_person_key: str) -> None:
+    """Merge source person group into target person group."""
+    if not source_person_key or not target_person_key:
+        raise ValueError("source and target person keys required")
+    if source_person_key == target_person_key:
+        return
+    connection.execute("UPDATE faces SET person_key = ? WHERE person_key = ?", (target_person_key, source_person_key))
+    connection.execute("DELETE FROM people WHERE person_key = ?", (source_person_key,))
+    connection.commit()
+
