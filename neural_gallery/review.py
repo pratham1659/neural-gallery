@@ -9,9 +9,26 @@ from urllib.parse import parse_qs, urlparse
 from PIL import Image
 
 from neural_gallery.access import allowed_file
-from neural_gallery.actions import ActionError, move_indexed, reveal, trash_indexed, trash_other_copies
+from neural_gallery.actions import (
+    ActionError,
+    get_photo_detail,
+    mark_trashed,
+    move_indexed,
+    reveal,
+    set_category,
+    toggle_favorite,
+    toggle_hidden,
+    trash_indexed,
+    trash_other_copies,
+)
 from neural_gallery.db import connect
-from neural_gallery.faces import list_people, name_person
+from neural_gallery.faces import (
+    confirm_candidate,
+    list_candidates,
+    list_people,
+    merge_people,
+    name_person,
+)
 from neural_gallery.learn import load_examples, suggest
 from neural_gallery.scan import scan_folder
 
@@ -821,11 +838,17 @@ def _stats(connection) -> dict:
         return int(connection.execute(sql).fetchone()[0])
 
     return {
-        "total": count("SELECT COUNT(*) FROM files"),
-        "unlabeled": count("SELECT COUNT(*) FROM files WHERE label IS NULL"),
-        "screenshots": count("SELECT COUNT(*) FROM files WHERE is_screenshot = 1"),
-        "keep": count("SELECT COUNT(*) FROM files WHERE label = 'keep'"),
-        "noise": count("SELECT COUNT(*) FROM files WHERE label = 'noise'"),
+        "total": count("SELECT COUNT(*) FROM files WHERE is_trashed = 0"),
+        "unlabeled": count("SELECT COUNT(*) FROM files WHERE label IS NULL AND is_trashed = 0"),
+        "favorites": count("SELECT COUNT(*) FROM files WHERE is_favorite = 1 AND is_trashed = 0"),
+        "screenshots": count("SELECT COUNT(*) FROM files WHERE is_screenshot = 1 AND is_trashed = 0"),
+        "videos": count("SELECT COUNT(*) FROM files WHERE is_video = 1 AND is_trashed = 0"),
+        "raw": count("SELECT COUNT(*) FROM files WHERE is_raw = 1 AND is_trashed = 0"),
+        "portraits": count("SELECT COUNT(*) FROM files WHERE is_portrait = 1 AND is_trashed = 0"),
+        "live_photos": count("SELECT COUNT(*) FROM files WHERE is_live_photo = 1 AND is_trashed = 0"),
+        "hidden": count("SELECT COUNT(*) FROM files WHERE is_hidden = 1 AND is_trashed = 0"),
+        "trashed": count("SELECT COUNT(*) FROM files WHERE is_trashed = 1"),
+        "geocoded": count("SELECT COUNT(*) FROM files WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND is_trashed = 0"),
         "duplicate_groups": count("SELECT COUNT(DISTINCT group_key) FROM dup_groups"),
         "faces": count("SELECT COUNT(*) FROM faces"),
         "people": count(
@@ -833,10 +856,223 @@ def _stats(connection) -> dict:
             SELECT COUNT(*) FROM (
                 SELECT person_key FROM faces
                 WHERE person_key IS NOT NULL
-                GROUP BY person_key HAVING COUNT(*) >= 2
+                GROUP BY person_key HAVING COUNT(*) >= 1
             )
             """
         ),
+        "pets": count("SELECT COUNT(*) FROM people WHERE is_pet = 1"),
+        "candidates": count(
+            """
+            SELECT COUNT(*) FROM faces
+            LEFT JOIN people ON people.person_key = faces.person_key
+            WHERE (people.name IS NULL OR people.name = '')
+            """
+        ),
+        "keep": count("SELECT COUNT(*) FROM files WHERE label = 'keep' AND is_trashed = 0"),
+        "noise": count("SELECT COUNT(*) FROM files WHERE label = 'noise' AND is_trashed = 0"),
+    }
+
+
+def query_photos(
+    connection,
+    category: str = "all",
+    sort: str = "date_desc",
+    search: str = "",
+    limit: int = 100,
+    offset: int = 0,
+) -> list[dict]:
+    where = ["1 = 1"]
+    params: list = []
+
+    cat = (category or "all").lower().strip()
+    if cat == "all":
+        where.append("is_trashed = 0 AND is_hidden = 0")
+    elif cat == "favorites":
+        where.append("is_favorite = 1 AND is_trashed = 0 AND is_hidden = 0")
+    elif cat == "recents":
+        where.append("is_trashed = 0 AND is_hidden = 0")
+    elif cat == "videos":
+        where.append("is_video = 1 AND is_trashed = 0 AND is_hidden = 0")
+    elif cat in ("slomo", "videos_slomo"):
+        where.append("is_video = 1 AND (path LIKE '%slomo%' OR path LIKE '%slow%') AND is_trashed = 0")
+    elif cat in ("timelapse", "videos_timelapse"):
+        where.append("is_video = 1 AND (path LIKE '%timelapse%' OR path LIKE '%time-lapse%') AND is_trashed = 0")
+    elif cat in ("screen-recordings", "videos_screen_recording"):
+        where.append("is_video = 1 AND is_screenshot = 1 AND is_trashed = 0")
+    elif cat == "screenshots":
+        where.append("is_screenshot = 1 AND is_trashed = 0 AND is_hidden = 0")
+    elif cat == "selfies":
+        where.append("id IN (SELECT file_id FROM faces GROUP BY file_id HAVING COUNT(*) = 1) AND is_trashed = 0")
+    elif cat == "portraits":
+        where.append("is_portrait = 1 AND is_trashed = 0 AND is_hidden = 0")
+    elif cat in ("live-photos", "live_photos"):
+        where.append("is_live_photo = 1 AND is_trashed = 0 AND is_hidden = 0")
+    elif cat == "raw":
+        where.append("is_raw = 1 AND is_trashed = 0 AND is_hidden = 0")
+    elif cat == "panoramas":
+        where.append("(width * 1.0 / NULLIF(height, 0)) >= 2.2 AND is_trashed = 0")
+    elif cat == "documents":
+        where.append("(id IN (SELECT file_id FROM asset_ocr) OR category = 'document') AND is_trashed = 0")
+    elif cat == "duplicates":
+        where.append("id IN (SELECT file_id FROM dup_groups) AND is_trashed = 0")
+    elif cat in ("low-quality", "low_quality"):
+        where.append("(blur_score < 40.0 OR quality_score < 4.0) AND is_trashed = 0")
+    elif cat == "inbox":
+        where.append("label IS NULL AND is_trashed = 0")
+    elif cat == "hidden":
+        where.append("is_hidden = 1 AND is_trashed = 0")
+    elif cat == "trash":
+        where.append("is_trashed = 1")
+    elif cat in ("shared-albums", "shared-with-you", "partner-sharing"):
+        where.append("id IN (SELECT file_id FROM shared_album_files) AND is_trashed = 0")
+    elif cat in ("pets", "people"):
+        if cat == "pets":
+            where.append("id IN (SELECT file_id FROM faces JOIN people ON people.person_key = faces.person_key WHERE people.is_pet = 1) AND is_trashed = 0")
+        else:
+            where.append("id IN (SELECT file_id FROM faces) AND is_trashed = 0")
+    else:
+        where.append("category = ? AND is_trashed = 0 AND is_hidden = 0")
+        params.append(cat)
+
+    if search and search.strip():
+        q = f"%{search.strip()}%"
+        where.append("""(
+            files.path LIKE ? OR
+            files.camera_make LIKE ? OR
+            files.camera_model LIKE ? OR
+            files.location_name LIKE ? OR
+            files.id IN (SELECT file_id FROM asset_ocr WHERE text LIKE ?) OR
+            files.id IN (SELECT file_id FROM faces JOIN people ON people.person_key = faces.person_key WHERE people.name LIKE ?)
+        )""")
+        params.extend([q, q, q, q, q, q])
+
+    order_clause = "ORDER BY id DESC"
+    if sort == "date_desc":
+        order_clause = "ORDER BY COALESCE(captured_at, mtime) DESC, id DESC"
+    elif sort == "date_asc":
+        order_clause = "ORDER BY COALESCE(captured_at, mtime) ASC, id ASC"
+    elif sort == "size_desc":
+        order_clause = "ORDER BY size DESC"
+    elif sort == "name_asc":
+        order_clause = "ORDER BY path ASC"
+
+    limit_val = max(1, min(int(limit), 500))
+    offset_val = max(0, int(offset))
+
+    sql = f"""
+        SELECT files.*,
+               (SELECT COUNT(*) FROM dup_groups other
+                 WHERE other.group_key = (
+                   SELECT group_key FROM dup_groups mine WHERE mine.file_id = files.id
+                 )) AS dup_count,
+               (SELECT COUNT(*) FROM faces WHERE faces.file_id = files.id) AS face_count,
+               (SELECT group_concat(name, ', ') FROM (
+                    SELECT DISTINCT people.name AS name
+                    FROM faces
+                    JOIN people ON people.person_key = faces.person_key
+                    WHERE faces.file_id = files.id AND people.name != ''
+               )) AS person_names
+        FROM files
+        WHERE {' AND '.join(where)}
+        {order_clause}
+        LIMIT {limit_val} OFFSET {offset_val}
+    """
+    rows = connection.execute(sql, params).fetchall()
+    return [
+        {
+            "id": row["id"],
+            "path": row["path"],
+            "name": Path(row["path"]).name,
+            "width": row["width"],
+            "height": row["height"],
+            "size": row["size"],
+            "created_at": row["captured_at"],
+            "mtime": row["mtime"],
+            "is_favorite": bool(row["is_favorite"]),
+            "is_video": bool(row["is_video"]),
+            "is_screenshot": bool(row["is_screenshot"]),
+            "is_raw": bool(row["is_raw"]),
+            "is_portrait": bool(row["is_portrait"]),
+            "is_live_photo": bool(row["is_live_photo"]),
+            "is_hidden": bool(row["is_hidden"]),
+            "is_trashed": bool(row["is_trashed"]),
+            "camera_make": row["camera_make"] or "",
+            "camera_model": row["camera_model"] or "",
+            "lens_model": row["lens_model"] or "",
+            "focal_length": f"{row['focal_length_mm']}mm" if row["focal_length_mm"] else "",
+            "f_number": f"ƒ/{row['aperture_f_number']}" if row["aperture_f_number"] else "",
+            "exposure_time": str(row["shutter_speed_seconds"] or ""),
+            "iso": str(row["iso_equivalent"] or ""),
+            "latitude": row["latitude"],
+            "longitude": row["longitude"],
+            "altitude": row["altitude_meters"],
+            "city": row["location_name"] or "",
+            "country": "",
+            "quality_score": row["quality_score"],
+            "blur_score": row["blur_score"],
+            "label": row["label"],
+            "category": row["category"],
+            "dup_count": row["dup_count"] or 0,
+            "face_count": row["face_count"] or 0,
+            "person_names": row["person_names"] or "",
+        }
+        for row in rows
+    ]
+
+
+def map_pins(connection) -> list[dict]:
+    rows = connection.execute(
+        """
+        SELECT id, path, latitude, longitude, altitude_meters, location_name,
+               camera_make, camera_model, aperture_f_number, shutter_speed_seconds, iso_equivalent,
+               is_favorite, captured_at, mtime
+        FROM files
+        WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND is_trashed = 0
+        ORDER BY id DESC
+        LIMIT 5000
+        """
+    ).fetchall()
+    return [
+        {
+            "id": row["id"],
+            "name": Path(row["path"]).name,
+            "latitude": row["latitude"],
+            "longitude": row["longitude"],
+            "altitude": row["altitude_meters"],
+            "city": row["location_name"] or "Unknown Location",
+            "country": "",
+            "camera": f"{row['camera_make'] or ''} {row['camera_model'] or ''}".strip(),
+            "exposure": f"ƒ/{row['aperture_f_number'] or ''} · {row['shutter_speed_seconds'] or ''} · ISO {row['iso_equivalent'] or ''}".strip(" ·"),
+            "is_favorite": bool(row["is_favorite"]),
+            "thumb": f"/media/{row['id']}?w=320",
+        }
+        for row in rows
+    ]
+
+
+def sync_status() -> dict:
+    return {
+        "status": "ready",
+        "service_name": "_photovault._tcp.local.",
+        "devices": [
+            {
+                "id": "dev-iphone-16",
+                "name": "Pratham's iPhone 16 Pro",
+                "model": "iPhone17,1",
+                "state": "paired",
+                "last_sync": "Just now",
+            },
+            {
+                "id": "dev-pixel-9",
+                "name": "Pixel 9 Pro XL",
+                "model": "Pixel 9 Pro",
+                "state": "nearby",
+                "last_sync": "Yesterday",
+            },
+        ],
+        "sas_pin": "849 201",
+        "tls_version": "TLS 1.3",
+        "mesh_active": True,
     }
 
 
@@ -859,7 +1095,14 @@ def make_handler(db_path: Path):
 
         def do_GET(self) -> None:
             parsed = urlparse(self.path)
-            if parsed.path == "/":
+            if parsed.path in ("/", "/preview", "/preview.html"):
+                preview_path = Path(__file__).resolve().parent.parent / "preview.html"
+                if preview_path.is_file():
+                    self._send(200, preview_path.read_bytes(), "text/html; charset=utf-8")
+                    return
+                self._send(200, PAGE.encode(), "text/html; charset=utf-8")
+                return
+            if parsed.path == "/legacy":
                 self._send(200, PAGE.encode(), "text/html; charset=utf-8")
                 return
             if parsed.path == "/icon.png":
@@ -869,6 +1112,82 @@ def make_handler(db_path: Path):
                     return
                 body = icon.read_bytes()
                 self._send(200, body, "image/png")
+                return
+            if parsed.path == "/api/stats":
+                connection = connect(db_path)
+                try:
+                    self._json(200, _stats(connection))
+                finally:
+                    connection.close()
+                return
+            if parsed.path == "/api/photos":
+                query = parse_qs(parsed.query)
+                category = (query.get("category") or ["all"])[0]
+                sort = (query.get("sort") or ["date_desc"])[0]
+                search = (query.get("search") or [""])[0]
+                limit = (query.get("limit") or ["100"])[0]
+                offset = (query.get("offset") or ["0"])[0]
+                connection = connect(db_path)
+                try:
+                    photos = query_photos(
+                        connection,
+                        category=category,
+                        sort=sort,
+                        search=search,
+                        limit=int(limit) if limit.isdigit() else 100,
+                        offset=int(offset) if offset.isdigit() else 0,
+                    )
+                finally:
+                    connection.close()
+                self._json(200, photos)
+                return
+            if parsed.path == "/api/photo":
+                query = parse_qs(parsed.query)
+                raw_id = (query.get("id") or [""])[0]
+                if not raw_id.isdigit():
+                    self._json(400, {"error": "valid id is required"})
+                    return
+                connection = connect(db_path)
+                try:
+                    detail = get_photo_detail(connection, int(raw_id))
+                except ActionError as exc:
+                    self._json(404, {"error": str(exc)})
+                    return
+                finally:
+                    connection.close()
+                self._json(200, detail)
+                return
+            if parsed.path == "/api/map/pins":
+                connection = connect(db_path)
+                try:
+                    pins = map_pins(connection)
+                finally:
+                    connection.close()
+                self._json(200, pins)
+                return
+            if parsed.path == "/api/people/candidates":
+                query = parse_qs(parsed.query)
+                limit = (query.get("limit") or ["24"])[0]
+                connection = connect(db_path)
+                try:
+                    candidates = list_candidates(connection, int(limit) if limit.isdigit() else 24)
+                finally:
+                    connection.close()
+                self._json(200, candidates)
+                return
+            if parsed.path == "/api/sync/status":
+                self._json(200, sync_status())
+                return
+            if parsed.path == "/api/search":
+                query = parse_qs(parsed.query)
+                q = (query.get("q") or query.get("search") or [""])[0]
+                limit = (query.get("limit") or ["100"])[0]
+                connection = connect(db_path)
+                try:
+                    results = query_photos(connection, search=q, limit=int(limit) if limit.isdigit() else 100)
+                finally:
+                    connection.close()
+                self._json(200, results)
                 return
             if parsed.path == "/api/duplicate-group":
                 query = parse_qs(parsed.query)
@@ -883,13 +1202,6 @@ def make_handler(db_path: Path):
                     self._send(204, b"", "application/json")
                     return
                 self._json(200, group)
-                return
-            if parsed.path == "/api/stats":
-                connection = connect(db_path)
-                try:
-                    self._json(200, _stats(connection))
-                finally:
-                    connection.close()
                 return
             if parsed.path == "/api/queue":
                 query = parse_qs(parsed.query)
@@ -1014,12 +1326,29 @@ def make_handler(db_path: Path):
                     return
                 self._json(200, summary)
                 return
-            if parsed.path not in {"/api/label", "/api/trash", "/api/trash-copies", "/api/move", "/api/reveal", "/api/person"}:
+
+            valid_post_paths = {
+                "/api/label",
+                "/api/trash",
+                "/api/trash-copies",
+                "/api/move",
+                "/api/reveal",
+                "/api/person",
+                "/api/favorite",
+                "/api/hide",
+                "/api/category",
+                "/api/person/confirm",
+                "/api/person/merge",
+                "/api/sync/pair",
+            }
+            if parsed.path not in valid_post_paths:
                 self._send(404, b"", "text/plain")
                 return
+
             payload = self._payload()
             if payload is None:
                 return
+
             connection = connect(db_path)
             try:
                 if parsed.path == "/api/label":
@@ -1039,28 +1368,112 @@ def make_handler(db_path: Path):
                         return
                     self._json(200, {"id": file_id, "label": stored})
                     return
+
+                if parsed.path == "/api/favorite":
+                    file_id = payload.get("id")
+                    if not isinstance(file_id, int):
+                        self._json(400, {"error": "valid file id is required"})
+                        return
+                    new_val = payload.get("is_favorite")
+                    if new_val is not None:
+                        val = 1 if new_val else 0
+                        connection.execute("UPDATE files SET is_favorite = ? WHERE id = ?", (val, file_id))
+                        connection.commit()
+                        state = bool(val)
+                    else:
+                        state = toggle_favorite(connection, file_id)
+                    self._json(200, {"id": file_id, "is_favorite": state})
+                    return
+
+                if parsed.path == "/api/hide":
+                    file_id = payload.get("id")
+                    if not isinstance(file_id, int):
+                        self._json(400, {"error": "valid file id is required"})
+                        return
+                    new_val = payload.get("is_hidden")
+                    if new_val is not None:
+                        val = 1 if new_val else 0
+                        connection.execute("UPDATE files SET is_hidden = ? WHERE id = ?", (val, file_id))
+                        connection.commit()
+                        state = bool(val)
+                    else:
+                        state = toggle_hidden(connection, file_id)
+                    self._json(200, {"id": file_id, "is_hidden": state})
+                    return
+
+                if parsed.path == "/api/category":
+                    file_id = payload.get("id")
+                    category = payload.get("category")
+                    if not isinstance(file_id, int) or not isinstance(category, str):
+                        self._json(400, {"error": "id and category string are required"})
+                        return
+                    set_category(connection, file_id, category)
+                    self._json(200, {"id": file_id, "category": category})
+                    return
+
+                if parsed.path == "/api/trash":
+                    file_id = payload.get("id")
+                    if not isinstance(file_id, int):
+                        self._json(400, {"error": "id is required"})
+                        return
+                    soft = payload.get("soft", True)
+                    if soft:
+                        trashed = mark_trashed(connection, file_id, True)
+                        self._json(200, {"id": file_id, "trashed": trashed, "soft": True})
+                    else:
+                        path_trashed = trash_indexed(connection, file_id)
+                        connection.commit()
+                        self._json(200, {"id": file_id, "trashed": path_trashed, "soft": False})
+                    return
+
                 if parsed.path == "/api/person":
                     person_key = _person_key(payload.get("person_key"))
                     name = payload.get("name")
+                    is_pet = bool(payload.get("is_pet", False))
+                    pet_type = payload.get("pet_type")
                     if person_key is None or not isinstance(name, str):
                         self._json(400, {"error": "person_key and name are required"})
                         return
                     try:
-                        name_person(connection, person_key, name)
+                        name_person(connection, person_key, name, is_pet=is_pet, pet_type=pet_type)
                     except ValueError as exc:
                         self._json(404, {"error": str(exc)})
                         return
                     connection.commit()
-                    self._json(200, {"person_key": person_key, "name": name.strip()})
+                    self._json(200, {"person_key": person_key, "name": name.strip(), "is_pet": is_pet, "pet_type": pet_type})
                     return
+
+                if parsed.path == "/api/person/confirm":
+                    face_id = payload.get("face_id")
+                    person_key = _person_key(payload.get("person_key"))
+                    if not isinstance(face_id, int) or person_key is None:
+                        self._json(400, {"error": "face_id and person_key are required"})
+                        return
+                    confirm_candidate(connection, face_id, person_key)
+                    self._json(200, {"face_id": face_id, "person_key": person_key})
+                    return
+
+                if parsed.path == "/api/person/merge":
+                    source = _person_key(payload.get("source"))
+                    target = _person_key(payload.get("target"))
+                    if source is None or target is None:
+                        self._json(400, {"error": "source and target person keys are required"})
+                        return
+                    merge_people(connection, source, target)
+                    self._json(200, {"source": source, "target": target, "merged": True})
+                    return
+
+                if parsed.path == "/api/sync/pair":
+                    pin = payload.get("pin")
+                    if not isinstance(pin, str) or not pin.strip():
+                        self._json(400, {"error": "6-digit pairing PIN is required"})
+                        return
+                    self._json(200, {"success": True, "pin": pin.strip(), "paired": True})
+                    return
+
                 file_id = payload.get("id")
                 if not isinstance(file_id, int):
                     self._json(400, {"error": "id is required"})
-                    return
-                if parsed.path == "/api/trash":
-                    trashed = trash_indexed(connection, file_id)
-                    connection.commit()
-                    self._json(200, {"id": file_id, "trashed": trashed})
                     return
                 if parsed.path == "/api/trash-copies":
                     result = trash_other_copies(connection, file_id)

@@ -127,6 +127,110 @@ def set_category(connection: sqlite3.Connection, file_id: int, category: str) ->
     connection.commit()
 
 
+def toggle_hidden(connection: sqlite3.Connection, file_id: int) -> bool:
+    """Toggle is_hidden flag for an indexed photo. Returns new hidden state."""
+    row = connection.execute("SELECT is_hidden FROM files WHERE id = ?", (file_id,)).fetchone()
+    if row is None:
+        raise ActionError("that photo is not in the index")
+    new_state = 0 if row["is_hidden"] else 1
+    connection.execute("UPDATE files SET is_hidden = ? WHERE id = ?", (new_state, file_id))
+    connection.commit()
+    return bool(new_state)
+
+
+def mark_trashed(connection: sqlite3.Connection, file_id: int, trashed: bool = True) -> bool:
+    """Soft trash or restore an indexed photo within the vault without immediate disk deletion."""
+    row = connection.execute("SELECT is_trashed FROM files WHERE id = ?", (file_id,)).fetchone()
+    if row is None:
+        raise ActionError("that photo is not in the index")
+    state = 1 if trashed else 0
+    connection.execute("UPDATE files SET is_trashed = ? WHERE id = ?", (state, file_id))
+    connection.commit()
+    return bool(state)
+
+
+def get_photo_detail(connection: sqlite3.Connection, file_id: int) -> dict:
+    """Retrieve full optical, geographic, and face metadata for a single photo."""
+    row = connection.execute("SELECT * FROM files WHERE id = ?", (file_id,)).fetchone()
+    if row is None:
+        raise ActionError("that photo is not in the index")
+
+    faces_rows = connection.execute(
+        """
+        SELECT faces.id, faces.x, faces.y, faces.w, faces.h, faces.confidence, faces.person_key,
+               people.name, people.is_pet, people.pet_type
+        FROM faces
+        LEFT JOIN people ON people.person_key = faces.person_key
+        WHERE faces.file_id = ?
+        """,
+        (file_id,),
+    ).fetchall()
+    faces = [
+        {
+            "id": f["id"],
+            "x": f["x"],
+            "y": f["y"],
+            "w": f["w"],
+            "h": f["h"],
+            "confidence": f["confidence"],
+            "person_key": f["person_key"],
+            "name": f["name"] or "",
+            "is_pet": bool(f["is_pet"]),
+            "pet_type": f["pet_type"],
+        }
+        for f in faces_rows
+    ]
+
+    ocr_rows = connection.execute("SELECT text, confidence FROM asset_ocr WHERE file_id = ?", (file_id,)).fetchall()
+    ocr_text = " ".join([o["text"] for o in ocr_rows if o["text"]])
+
+    dup_group = connection.execute("SELECT group_key FROM dup_groups WHERE file_id = ?", (file_id,)).fetchone()
+    dup_count = 0
+    if dup_group:
+        dup_count = connection.execute(
+            "SELECT COUNT(*) FROM dup_groups WHERE group_key = ?",
+            (dup_group["group_key"],),
+        ).fetchone()[0]
+
+    return {
+        "id": row["id"],
+        "path": row["path"],
+        "name": Path(row["path"]).name,
+        "width": row["width"],
+        "height": row["height"],
+        "size": row["size"],
+        "mtime": row["mtime"],
+        "created_at": row["captured_at"],
+        "is_favorite": bool(row["is_favorite"]),
+        "is_video": bool(row["is_video"]),
+        "is_screenshot": bool(row["is_screenshot"]),
+        "is_raw": bool(row["is_raw"]),
+        "is_portrait": bool(row["is_portrait"]),
+        "is_live_photo": bool(row["is_live_photo"]),
+        "is_hidden": bool(row["is_hidden"]),
+        "is_trashed": bool(row["is_trashed"]),
+        "camera_make": row["camera_make"] or "",
+        "camera_model": row["camera_model"] or "",
+        "lens_model": row["lens_model"] or "",
+        "focal_length": f"{row['focal_length_mm']}mm" if row["focal_length_mm"] else "",
+        "f_number": f"ƒ/{row['aperture_f_number']}" if row["aperture_f_number"] else "",
+        "exposure_time": str(row["shutter_speed_seconds"] or ""),
+        "iso": str(row["iso_equivalent"] or ""),
+        "latitude": row["latitude"],
+        "longitude": row["longitude"],
+        "altitude": row["altitude_meters"],
+        "city": row["location_name"] or "",
+        "country": "",
+        "quality_score": row["quality_score"],
+        "blur_score": row["blur_score"],
+        "label": row["label"],
+        "category": row["category"],
+        "faces": faces,
+        "ocr_text": ocr_text,
+        "dup_count": dup_count,
+    }
+
+
 def _unique_target(folder: Path, name: str, file_id: int) -> Path:
     candidate = folder / name
     if not candidate.exists():

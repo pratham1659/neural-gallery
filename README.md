@@ -76,6 +76,33 @@ neural-gallery serve
 
 ---
 
+## Local REST API & Webview Endpoints
+
+Neural Gallery serves a local, air-gapped JSON REST API that powers both the browser interface and the native desktop webview:
+
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/api/stats` | `GET` | Library counters for all categories, favorites, media types, geocoded photos, and faces. |
+| `/api/photos` | `GET` | Filtered photos grid by category (`all`, `favorites`, `recents`, `videos`, `screenshots`, `raw`, `panoramas`, `portraits`, `documents`, `duplicates`, `hidden`, `trash`), sort order, and pagination. |
+| `/api/photo?id=<id>` | `GET` | Detailed metadata, full optical EXIF, GPS coords, face bounding boxes, and OCR text. |
+| `/api/favorite` | `POST` | Toggle or set favorite status (`{"id": int, "is_favorite": bool}`). |
+| `/api/hide` | `POST` | Toggle or set hidden vault status (`{"id": int, "is_hidden": bool}`). |
+| `/api/trash` | `POST` | Soft-trash in vault or move to Finder Trash (`{"id": int, "soft": bool}`). |
+| `/api/category` | `POST` | Update category tag for an item (`{"id": int, "category": str}`). |
+| `/api/map/pins` | `GET` | Geocoded locations with latitude, longitude, city, thumbnail, and camera optics. |
+| `/api/people` | `GET` | Clustered people and pets with face count, photo count, and sample crops. |
+| `/api/people/candidates` | `GET` | Candidate face detections awaiting user verification ("Confirm Candidate Faces"). |
+| `/api/person/confirm` | `POST` | Confirm a candidate face into a person group (`{"face_id": int, "person_key": str}`). |
+| `/api/person/merge` | `POST` | Merge two person groups (`{"source": str, "target": str}`). |
+| `/api/sync/status` | `GET` | P2P local Wi-Fi sync mesh status, paired devices, and SAS PIN pairing state. |
+| `/api/sync/pair` | `POST` | Validate 6-digit SAS pairing PIN (`{"pin": str}`). |
+| `/api/search` | `GET` | Search across OCR text, camera models, locations, and filenames. |
+| `/media/<id>?w=<pixels>` | `GET` | On-the-fly thumbnail and preview delivery directly from local storage. |
+| `/` | `GET` | Modern interactive glassmorphic gallery UI. |
+| `/legacy` | `GET` | Classical 3-button keyboard review triage view. |
+
+---
+
 ## Keyboard Shortcuts
 
 | Shortcut | Action |
