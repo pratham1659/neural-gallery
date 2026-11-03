@@ -1,7 +1,7 @@
-"""On-device face grouping with Apple's Vision framework.
+"""On-device face and pet grouping with Apple's Vision framework.
 
-Faces never leave this Mac. A group means two face crops look alike to Vision's
-image feature print. It is a hint you can name. It is not a police-style match.
+Faces and pet detections never leave this Mac. A group means two face crops look
+alike to Vision's image feature print. It is an on-device hint you can name.
 """
 
 import io
@@ -11,8 +11,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageOps
 
-# Cosine distance. Lower is more alike. 0.34 kept same-person crops together
-# in local checks without merging obviously different crops.
+# Cosine distance. Lower is more alike.
 MATCH_DISTANCE = 0.34
 
 
@@ -34,75 +33,153 @@ def crop_box(width: int, height: int, x: float, y: float, w: float, h: float, pa
 
 
 def _feature_print(image: Image.Image) -> np.ndarray | None:
-    import Vision
-    from Foundation import NSData
+    try:
+        import Vision
+        from Foundation import NSData
 
-    buffer = io.BytesIO()
-    image.convert("RGB").save(buffer, format="JPEG", quality=90)
-    data = NSData.dataWithBytes_length_(buffer.getvalue(), len(buffer.getvalue()))
-    request = Vision.VNGenerateImageFeaturePrintRequest.alloc().init()
-    handler = Vision.VNImageRequestHandler.alloc().initWithData_options_(data, None)
-    ok, _error = handler.performRequests_error_([request], None)
-    if not ok:
+        buffer = io.BytesIO()
+        image.convert("RGB").save(buffer, format="JPEG", quality=90)
+        data = NSData.dataWithBytes_length_(buffer.getvalue(), len(buffer.getvalue()))
+        request = Vision.VNGenerateImageFeaturePrintRequest.alloc().init()
+        handler = Vision.VNImageRequestHandler.alloc().initWithData_options_(data, None)
+        ok, _error = handler.performRequests_error_([request], None)
+        if not ok:
+            return None
+        results = request.results() or []
+        if not results:
+            return None
+        observation = results[0]
+        raw = bytes(observation.data())
+        count = int(observation.elementCount())
+        if count <= 0 or len(raw) < count * 4:
+            return None
+        vector = np.frombuffer(raw[: count * 4], dtype="<f4").astype(np.float32)
+        norm = float(np.linalg.norm(vector))
+        if norm == 0:
+            return None
+        return vector / norm
+    except Exception:
         return None
-    results = request.results() or []
-    if not results:
-        return None
-    observation = results[0]
-    raw = bytes(observation.data())
-    count = int(observation.elementCount())
-    if count <= 0 or len(raw) < count * 4:
-        return None
-    vector = np.frombuffer(raw[: count * 4], dtype="<f4").astype(np.float32)
-    norm = float(np.linalg.norm(vector))
-    if norm == 0:
-        return None
-    return vector / norm
 
 
 def _detect_boxes(path: Path) -> list[tuple[float, float, float, float]]:
-    import Vision
-    from Foundation import NSURL
+    """Detect human faces using Apple Vision VNDetectFaceRectanglesRequest."""
+    try:
+        import Vision
+        from Foundation import NSURL
 
-    url = NSURL.fileURLWithPath_(str(path))
-    request = Vision.VNDetectFaceRectanglesRequest.alloc().init()
-    handler = Vision.VNImageRequestHandler.alloc().initWithURL_options_(url, None)
-    ok, _error = handler.performRequests_error_([request], None)
-    if not ok:
+        url = NSURL.fileURLWithPath_(str(path))
+        request = Vision.VNDetectFaceRectanglesRequest.alloc().init()
+        handler = Vision.VNImageRequestHandler.alloc().initWithURL_options_(url, None)
+        ok, _error = handler.performRequests_error_([request], None)
+        if not ok:
+            return []
+        boxes = []
+        for face in request.results() or []:
+            box = face.boundingBox()
+            boxes.append((float(box.origin.x), float(box.origin.y), float(box.size.width), float(box.size.height)))
+        return boxes
+    except Exception:
         return []
-    boxes = []
-    for face in request.results() or []:
-        box = face.boundingBox()
-        boxes.append((float(box.origin.x), float(box.origin.y), float(box.size.width), float(box.size.height)))
-    return boxes
+
+
+def _detect_animals(path: Path) -> list[tuple[float, float, float, float, str, float]]:
+    """Detect pets (dogs, cats) using Apple Vision VNRecognizeAnimalsRequest."""
+    try:
+        import Vision
+        from Foundation import NSURL
+
+        if not hasattr(Vision, "VNRecognizeAnimalsRequest"):
+            return []
+
+        url = NSURL.fileURLWithPath_(str(path))
+        request = Vision.VNRecognizeAnimalsRequest.alloc().init()
+        handler = Vision.VNImageRequestHandler.alloc().initWithURL_options_(url, None)
+        ok, _error = handler.performRequests_error_([request], None)
+        if not ok:
+            return []
+
+        results = []
+        for animal in request.results() or []:
+            box = animal.boundingBox()
+            labels = animal.labels() or []
+            label_name = "pet"
+            confidence = float(animal.confidence()) if hasattr(animal, "confidence") else 0.95
+            if labels:
+                top_label = str(labels[0].identifier()).lower()
+                if "dog" in top_label:
+                    label_name = "dog"
+                elif "cat" in top_label:
+                    label_name = "cat"
+            results.append((
+                float(box.origin.x), float(box.origin.y),
+                float(box.size.width), float(box.size.height),
+                label_name, confidence
+            ))
+        return results
+    except Exception:
+        return []
 
 
 def index_faces(path: Path) -> list[dict]:
-    boxes = _detect_boxes(path)
-    if not boxes:
+    human_boxes = _detect_boxes(path)
+    animal_boxes = _detect_animals(path)
+    if not human_boxes and not animal_boxes:
         return []
-    with Image.open(path) as image:
-        oriented = ImageOps.exif_transpose(image)
-        width, height = oriented.size
-        found = []
-        for x, y, w, h in boxes:
-            pixels = crop_box(width, height, x, y, w, h)
-            if pixels is None:
-                continue
-            crop = oriented.crop(pixels)
-            if min(crop.size) < 24:
-                continue
-            feature = _feature_print(crop)
-            if feature is None:
-                continue
-            found.append({
-                "x": x,
-                "y": y,
-                "w": w,
-                "h": h,
-                "feature": feature.tobytes(),
-            })
-        return found
+
+    found = []
+    try:
+        with Image.open(path) as image:
+            oriented = ImageOps.exif_transpose(image)
+            width, height = oriented.size
+
+            # Human Faces
+            for x, y, w, h in human_boxes:
+                pixels = crop_box(width, height, x, y, w, h)
+                if pixels is None:
+                    continue
+                crop = oriented.crop(pixels)
+                if min(crop.size) < 24:
+                    continue
+                feature = _feature_print(crop)
+                if feature is None:
+                    continue
+                found.append({
+                    "x": x,
+                    "y": y,
+                    "w": w,
+                    "h": h,
+                    "feature": feature.tobytes(),
+                    "is_pet": 0,
+                    "pet_type": None,
+                    "confidence": 0.99,
+                })
+
+            # Pets & Animals
+            for x, y, w, h, pet_type, conf in animal_boxes:
+                pixels = crop_box(width, height, x, y, w, h)
+                if pixels is None:
+                    continue
+                crop = oriented.crop(pixels)
+                if min(crop.size) < 24:
+                    continue
+                feature = _feature_print(crop)
+                if feature is None:
+                    continue
+                found.append({
+                    "x": x,
+                    "y": y,
+                    "w": w,
+                    "h": h,
+                    "feature": feature.tobytes(),
+                    "is_pet": 1,
+                    "pet_type": pet_type,
+                    "confidence": conf,
+                })
+    except Exception:
+        return []
+
+    return found
 
 
 def scan_faces(db_path: Path, progress=print) -> dict:
@@ -130,10 +207,10 @@ def scan_faces(db_path: Path, progress=print) -> dict:
             for face in faces:
                 connection.execute(
                     """
-                    INSERT INTO faces(file_id, x, y, w, h, feature)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO faces(file_id, x, y, w, h, feature, confidence)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (row["id"], face["x"], face["y"], face["w"], face["h"], face["feature"]),
+                    (row["id"], face["x"], face["y"], face["w"], face["h"], face["feature"], face.get("confidence", 1.0)),
                 )
                 added += 1
             connection.execute(
@@ -226,12 +303,14 @@ def list_people(connection: sqlite3.Connection) -> list[dict]:
                COUNT(*) AS face_count,
                COUNT(DISTINCT faces.file_id) AS photo_count,
                MIN(faces.file_id) AS sample_id,
-               people.name AS name
+               people.name AS name,
+               COALESCE(people.is_favorite, 0) AS is_favorite,
+               COALESCE(people.is_pet, 0) AS is_pet,
+               people.pet_type AS pet_type
         FROM faces
         LEFT JOIN people ON people.person_key = faces.person_key
         WHERE faces.person_key IS NOT NULL
         GROUP BY faces.person_key
-        HAVING COUNT(*) >= 2
         ORDER BY photo_count DESC, faces.person_key
         """
     ).fetchall()
@@ -242,12 +321,15 @@ def list_people(connection: sqlite3.Connection) -> list[dict]:
             "face_count": row["face_count"],
             "photo_count": row["photo_count"],
             "sample_id": row["sample_id"],
+            "is_favorite": bool(row["is_favorite"]),
+            "is_pet": bool(row["is_pet"]),
+            "pet_type": row["pet_type"],
         }
         for row in rows
     ]
 
 
-def name_person(connection: sqlite3.Connection, person_key: str, name: str) -> None:
+def name_person(connection: sqlite3.Connection, person_key: str, name: str, is_pet: bool = False, pet_type: str = None) -> None:
     cleaned = name.strip()
     if not person_key or len(person_key) > 64 or not person_key.startswith("p"):
         raise ValueError("unknown person")
@@ -259,8 +341,15 @@ def name_person(connection: sqlite3.Connection, person_key: str, name: str) -> N
         raise ValueError("unknown person")
     if cleaned:
         connection.execute(
-            "INSERT INTO people(person_key, name) VALUES (?, ?) ON CONFLICT(person_key) DO UPDATE SET name = excluded.name",
-            (person_key, cleaned[:80]),
+            """
+            INSERT INTO people(person_key, name, is_pet, pet_type)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(person_key) DO UPDATE SET
+                name = excluded.name,
+                is_pet = excluded.is_pet,
+                pet_type = excluded.pet_type
+            """,
+            (person_key, cleaned[:80], int(is_pet), pet_type),
         )
     else:
         connection.execute("DELETE FROM people WHERE person_key = ?", (person_key,))
