@@ -22,6 +22,11 @@ def _print_stats(db_path: Path) -> None:
         noise = connection.execute("SELECT COUNT(*) FROM files WHERE label = 'noise'").fetchone()[0]
         groups = connection.execute("SELECT COUNT(DISTINCT group_key) FROM dup_groups").fetchone()[0]
         faces = connection.execute("SELECT COUNT(*) FROM faces").fetchone()[0]
+        favorites = connection.execute("SELECT COUNT(*) FROM files WHERE is_favorite = 1").fetchone()[0]
+        videos = connection.execute("SELECT COUNT(*) FROM files WHERE is_video = 1").fetchone()[0]
+        raw_photos = connection.execute("SELECT COUNT(*) FROM files WHERE is_raw = 1").fetchone()[0]
+        portraits = connection.execute("SELECT COUNT(*) FROM files WHERE is_portrait = 1").fetchone()[0]
+        geocoded = connection.execute("SELECT COUNT(*) FROM files WHERE latitude IS NOT NULL").fetchone()[0]
         people = connection.execute(
             """
             SELECT COUNT(*) FROM (
@@ -31,16 +36,23 @@ def _print_stats(db_path: Path) -> None:
             )
             """
         ).fetchone()[0]
+        pets = connection.execute("SELECT COUNT(*) FROM people WHERE is_pet = 1").fetchone()[0]
     finally:
         connection.close()
     print(f"photos        {total}")
+    print(f"favorites     {favorites}")
     print(f"unlabeled     {unlabeled}")
+    print(f"videos        {videos}")
+    print(f"raw photos    {raw_photos}")
+    print(f"portraits     {portraits}")
     print(f"screenshots   {screenshots}")
+    print(f"geocoded      {geocoded}")
     print(f"keep          {keep}")
     print(f"noise         {noise}")
     print(f"dup groups    {groups}")
     print(f"faces         {faces}")
     print(f"people        {people}")
+    print(f"pets          {pets}")
     print(f"index         {db_path}")
 
 

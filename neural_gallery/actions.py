@@ -107,6 +107,26 @@ def reveal(connection: sqlite3.Connection, file_id: int) -> None:
     subprocess.run(["open", "-R", str(path)], check=False)
 
 
+def toggle_favorite(connection: sqlite3.Connection, file_id: int) -> bool:
+    """Toggle is_favorite flag for an indexed photo. Returns new favorite state."""
+    row = connection.execute("SELECT is_favorite FROM files WHERE id = ?", (file_id,)).fetchone()
+    if row is None:
+        raise ActionError("that photo is not in the index")
+    new_state = 0 if row["is_favorite"] else 1
+    connection.execute("UPDATE files SET is_favorite = ? WHERE id = ?", (new_state, file_id))
+    connection.commit()
+    return bool(new_state)
+
+
+def set_category(connection: sqlite3.Connection, file_id: int, category: str) -> None:
+    """Set media category tag for an indexed item."""
+    exists = connection.execute("SELECT 1 FROM files WHERE id = ?", (file_id,)).fetchone()
+    if exists is None:
+        raise ActionError("that photo is not in the index")
+    connection.execute("UPDATE files SET category = ? WHERE id = ?", (category.strip().lower(), file_id))
+    connection.commit()
+
+
 def _unique_target(folder: Path, name: str, file_id: int) -> Path:
     candidate = folder / name
     if not candidate.exists():
