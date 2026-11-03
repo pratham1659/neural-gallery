@@ -1,0 +1,2159 @@
+<!DOCTYPE html>
+<html lang="en" class="theme-light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Neural Gallery Vault - Interactive UI Prototype</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    /* ==========================================================================
+       THEME VARIABLES: APPLE HIG LIGHT GLASSMORPHISM (DEFAULT) & OBSIDIAN DARK
+       ========================================================================== */
+    :root, .theme-light {
+      --canvas-bg: #ece9e2;
+      --text-main: #1c1917;
+      --text-secondary: #57534e;
+      --text-muted: #8c857b;
+      --text-faint: #a8a29e;
+      
+      /* Glassmorphism Window & Panels */
+      --window-bg: rgba(255, 255, 255, 0.76);
+      --window-border: rgba(255, 255, 255, 0.88);
+      --window-border-outer: rgba(0, 0, 0, 0.08);
+      --window-shadow: 0 30px 70px -15px rgba(45, 40, 35, 0.14), 0 10px 25px -5px rgba(45, 40, 35, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+      
+      --header-bg: rgba(255, 255, 255, 0.82);
+      --header-border: rgba(0, 0, 0, 0.06);
+      
+      --sidebar-bg: rgba(248, 246, 242, 0.72);
+      --sidebar-border: rgba(0, 0, 0, 0.06);
+      --sidebar-btn-hover: rgba(255, 255, 255, 0.7);
+      --sidebar-btn-active: rgba(255, 255, 255, 0.98);
+      --sidebar-btn-active-text: #1c1917;
+      --sidebar-btn-active-border: rgba(0, 0, 0, 0.08);
+      --sidebar-btn-active-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      
+      --main-bg: rgba(255, 255, 255, 0.45);
+      --sub-bar-bg: rgba(255, 255, 255, 0.60);
+      --sub-bar-border: rgba(0, 0, 0, 0.05);
+      
+      --card-bg: rgba(255, 255, 255, 0.88);
+      --card-border: rgba(255, 255, 255, 0.95);
+      --card-border-hover: rgba(168, 162, 158, 0.8);
+      --card-shadow: 0 4px 14px rgba(45, 40, 35, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+      --card-active-ring: #1c1917;
+      
+      --pill-bg: rgba(255, 255, 255, 0.75);
+      --pill-border: rgba(0, 0, 0, 0.08);
+      --pill-text: #57534e;
+      --pill-hover-bg: rgba(255, 255, 255, 0.95);
+      --pill-hover-border: rgba(0, 0, 0, 0.15);
+      --pill-hover-text: #1c1917;
+      --pill-active-bg: #1c1917;
+      --pill-active-text: #ffffff;
+      --pill-active-border: #1c1917;
+      
+      --input-bg: rgba(255, 255, 255, 0.85);
+      --input-border: rgba(0, 0, 0, 0.12);
+      --input-focus-border: #57534e;
+      --input-text: #1c1917;
+      --input-placeholder: #a8a29e;
+      
+      --dialog-overlay: rgba(240, 238, 233, 0.5);
+      --dialog-bg: rgba(255, 255, 255, 0.92);
+      --dialog-border: rgba(255, 255, 255, 0.95);
+      --dialog-shadow: 0 30px 65px -15px rgba(45, 40, 35, 0.16), 0 0 0 1px rgba(0, 0, 0, 0.04), inset 0 1px 1px rgba(255, 255, 255, 1);
+      
+      --btn-primary-bg: #1c1917;
+      --btn-primary-text: #ffffff;
+      --btn-primary-hover: #292524;
+      
+      --btn-ghost-bg: rgba(255, 255, 255, 0.8);
+      --btn-ghost-border: rgba(0, 0, 0, 0.1);
+      --btn-ghost-text: #292524;
+      --btn-ghost-hover: rgba(255, 255, 255, 1);
+      
+      --table-header-bg: rgba(245, 243, 238, 0.8);
+      --table-row-hover: rgba(255, 255, 255, 0.9);
+      --table-divider: rgba(0, 0, 0, 0.05);
+      
+      --badge-neutral-bg: rgba(0, 0, 0, 0.05);
+      --badge-neutral-text: #57534e;
+      --badge-neutral-border: rgba(0, 0, 0, 0.08);
+
+      --scrollbar-track: rgba(0, 0, 0, 0.03);
+      --scrollbar-thumb: rgba(0, 0, 0, 0.18);
+      --scrollbar-thumb-hover: rgba(0, 0, 0, 0.3);
+      
+      --tree-line: rgba(0, 0, 0, 0.1);
+      --map-bg: #e2dfd7;
+      --map-water: #c4d9e6;
+      --map-land: #dedad0;
+      --map-road: #cbc6ba;
+    }
+
+    .theme-dark {
+      --canvas-bg: #090d16;
+      --text-main: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --text-faint: #475569;
+      
+      /* Glassmorphism Window & Panels (Obsidian Dark) */
+      --window-bg: rgba(15, 23, 42, 0.92);
+      --window-border: rgba(51, 65, 85, 0.6);
+      --window-border-outer: rgba(0, 0, 0, 0.4);
+      --window-shadow: 0 30px 70px -15px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      
+      --header-bg: rgba(15, 23, 42, 0.88);
+      --header-border: rgba(30, 41, 59, 0.8);
+      
+      --sidebar-bg: rgba(15, 23, 42, 0.82);
+      --sidebar-border: rgba(30, 41, 59, 0.8);
+      --sidebar-btn-hover: rgba(30, 41, 59, 0.6);
+      --sidebar-btn-active: rgba(37, 99, 235, 0.2);
+      --sidebar-btn-active-text: #93c5fd;
+      --sidebar-btn-active-border: rgba(59, 130, 246, 0.3);
+      --sidebar-btn-active-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+      
+      --main-bg: #090d16;
+      --sub-bar-bg: rgba(15, 23, 42, 0.55);
+      --sub-bar-border: rgba(30, 41, 59, 0.8);
+      
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --card-border: rgba(51, 65, 85, 0.6);
+      --card-border-hover: rgba(59, 130, 246, 0.8);
+      --card-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+      --card-active-ring: #60a5fa;
+      
+      --pill-bg: rgba(30, 41, 59, 0.6);
+      --pill-border: rgba(51, 65, 85, 0.6);
+      --pill-text: #94a3b8;
+      --pill-hover-bg: rgba(51, 65, 85, 0.8);
+      --pill-hover-border: rgba(71, 85, 105, 0.8);
+      --pill-hover-text: #f1f5f9;
+      --pill-active-bg: #2563eb;
+      --pill-active-text: #ffffff;
+      --pill-active-border: #3b82f6;
+      
+      --input-bg: rgba(30, 41, 59, 0.8);
+      --input-border: rgba(51, 65, 85, 0.8);
+      --input-focus-border: #3b82f6;
+      --input-text: #f1f5f9;
+      --input-placeholder: #64748b;
+      
+      --dialog-overlay: rgba(3, 7, 18, 0.7);
+      --dialog-bg: rgba(15, 23, 42, 0.95);
+      --dialog-border: rgba(51, 65, 85, 0.8);
+      --dialog-shadow: 0 30px 65px -15px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      
+      --btn-primary-bg: #2563eb;
+      --btn-primary-text: #ffffff;
+      --btn-primary-hover: #1d4ed8;
+      
+      --btn-ghost-bg: rgba(30, 41, 59, 0.8);
+      --btn-ghost-border: rgba(51, 65, 85, 0.8);
+      --btn-ghost-text: #e2e8f0;
+      --btn-ghost-hover: rgba(51, 65, 85, 0.9);
+      
+      --table-header-bg: rgba(15, 23, 42, 0.9);
+      --table-row-hover: rgba(30, 41, 59, 0.7);
+      --table-divider: rgba(51, 65, 85, 0.5);
+      
+      --badge-neutral-bg: rgba(255, 255, 255, 0.06);
+      --badge-neutral-text: #94a3b8;
+      --badge-neutral-border: rgba(255, 255, 255, 0.1);
+
+      --scrollbar-track: rgba(255, 255, 255, 0.02);
+      --scrollbar-thumb: rgba(255, 255, 255, 0.15);
+      --scrollbar-thumb-hover: rgba(255, 255, 255, 0.25);
+      
+      --tree-line: rgba(255, 255, 255, 0.12);
+      --map-bg: #0b1120;
+      --map-water: #071527;
+      --map-land: #121e33;
+      --map-road: #1e293b;
+    }
+
+    body {
+      background: var(--canvas-bg);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+      transition: background-color 0.25s ease, color 0.25s ease;
+      overflow-x: hidden;
+      margin: 0;
+      padding: 0;
+    }
+
+    .mac-window {
+      background: var(--window-bg);
+      backdrop-filter: blur(40px) saturate(180%);
+      -webkit-backdrop-filter: blur(40px) saturate(180%);
+      box-shadow: var(--window-shadow);
+      border: 1px solid var(--window-border);
+      outline: 1px solid var(--window-border-outer);
+    }
+
+    .glass-header {
+      background: var(--header-bg);
+      border-bottom: 1px solid var(--header-border);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+    }
+
+    .glass-sidebar {
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--sidebar-border);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+    }
+
+    .glass-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      box-shadow: var(--card-shadow);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .glass-card:hover {
+      border-color: var(--card-border-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+    }
+
+    .photo-card.active-card {
+      outline: 2.5px solid var(--card-active-ring);
+      outline-offset: 1px;
+    }
+
+    .category-btn {
+      transition: all 0.15s ease;
+      color: var(--text-secondary);
+      border: 1px solid transparent;
+    }
+
+    .category-btn:hover {
+      background: var(--sidebar-btn-hover);
+      color: var(--text-main);
+    }
+
+    .category-btn.active-category {
+      background: var(--sidebar-btn-active);
+      color: var(--sidebar-btn-active-text);
+      border-color: var(--sidebar-btn-active-border);
+      box-shadow: var(--sidebar-btn-active-shadow);
+      font-weight: 600;
+    }
+
+    .filter-pill {
+      background: var(--pill-bg);
+      border: 1px solid var(--pill-border);
+      color: var(--pill-text);
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .filter-pill:hover {
+      background: var(--pill-hover-bg);
+      border-color: var(--pill-hover-border);
+      color: var(--pill-hover-text);
+    }
+
+    .filter-pill.active-pill {
+      background: var(--pill-active-bg);
+      color: var(--pill-active-text);
+      border-color: var(--pill-active-border);
+      font-weight: 600;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+    }
+
+    .mode-switch-btn.active {
+      background: var(--pill-active-bg);
+      color: var(--pill-active-text);
+      font-weight: 600;
+    }
+
+    .mode-switch-btn.inactive {
+      color: var(--text-muted);
+    }
+
+    .mode-switch-btn.inactive:hover {
+      color: var(--text-main);
+    }
+
+    .custom-scroll::-webkit-scrollbar {
+      width: 7px;
+      height: 7px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: var(--scrollbar-track);
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb);
+      border-radius: 4px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb:hover {
+      background: var(--scrollbar-thumb-hover);
+    }
+
+    .chevron-arrow {
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .chevron-arrow.rotated {
+      transform: rotate(90deg);
+    }
+
+    .sub-tree {
+      border-left: 1.5px solid var(--tree-line);
+      margin-left: 1.15rem;
+      padding-left: 0.4rem;
+      transition: max-height 0.25s ease, opacity 0.2s ease;
+    }
+    .sub-tree.collapsed {
+      display: none;
+    }
+
+    /* Pulse animation for map pins */
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.3); opacity: 0.2; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .pin-pulse {
+      animation: pulse-ring 2.5s infinite ease-in-out;
+    }
+
+    .map-canvas {
+      background-color: var(--map-bg);
+      background-image: 
+        radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.04) 0%, transparent 70%),
+        linear-gradient(var(--map-road) 1px, transparent 1px),
+        linear-gradient(90deg, var(--map-road) 1px, transparent 1px);
+      background-size: 100% 100%, 36px 36px, 36px 36px;
+    }
+  </style>
+</head>
+<body class="p-3 md:p-6 lg:p-8 min-h-screen flex items-center justify-center">
+
+  <!-- macOS Window Frame -->
+  <div class="mac-window w-full max-w-[1580px] h-[94vh] rounded-2xl flex flex-col overflow-hidden relative">
+
+    <!-- ========================================================================
+         VAULT LOCK SCREEN MODAL (CMD+L DEMO)
+         ======================================================================== -->
+    <div id="unlockScreen" class="absolute inset-0 z-50 flex items-center justify-center hidden" style="background: var(--dialog-overlay); backdrop-filter: blur(28px);">
+      <div class="p-8 rounded-2xl w-96 flex flex-col items-center text-center shadow-2xl border" style="background: var(--dialog-bg); border-color: var(--dialog-border); box-shadow: var(--dialog-shadow);">
+        <div class="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 shadow-sm" style="background: rgba(0, 0, 0, 0.04); border: 1px solid var(--window-border);">
+          <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Locked/3D/locked_3d.png" class="w-10 h-10 object-contain" alt="Vault Locked">
+        </div>
+        <h2 class="text-base font-bold tracking-tight mb-1" style="color: var(--text-main);">Neural Gallery Vault</h2>
+        <p class="text-xs mb-5 font-mono" style="color: var(--text-muted);">Encrypted via AES-256-GCM · Master Key</p>
+        
+        <div class="w-full space-y-3">
+          <input type="password" id="unlockPin" placeholder="Enter Vault PIN or Passphrase" value="1234" class="w-full px-3.5 py-2.5 rounded-xl text-center text-sm font-mono tracking-widest focus:outline-hidden transition-all shadow-inner border" style="background: var(--input-bg); border-color: var(--input-border); color: var(--input-text);">
+          
+          <button onclick="unlockVault()" class="w-full py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer" style="background: var(--btn-primary-bg); color: var(--btn-primary-text);">
+            <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Key/3D/key_3d.png" class="w-4 h-4 object-contain" alt="Unlock">
+            <span>Unlock Vault</span>
+          </button>
+
+          <button onclick="unlockVaultBiometric()" class="w-full py-2 rounded-xl text-xs font-medium transition-all flex items-center justify-center gap-2 cursor-pointer border" style="background: var(--btn-ghost-bg); border-color: var(--btn-ghost-border); color: var(--btn-ghost-text);">
+            <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Shield/3D/shield_3d.png" class="w-4 h-4 object-contain" alt="Touch ID">
+            <span>Unlock with Touch ID / Face ID</span>
+          </button>
+        </div>
+        <p class="text-[10px] font-mono mt-4" style="color: var(--text-faint);">Hardware Enclave Authenticated</p>
+      </div>
+    </div>
+
+    <!-- ========================================================================
+         TOP WINDOW CHROME / HEADER
+         ======================================================================== -->
+    <header class="glass-header h-12 flex items-center justify-between px-4 select-none shrink-0 z-30">
+      
+      <!-- Traffic Lights & Title -->
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2">
+          <div class="w-3 h-3 rounded-full bg-rose-500 hover:opacity-80 cursor-pointer shadow-xs border border-rose-600/30"></div>
+          <div class="w-3 h-3 rounded-full bg-amber-400 hover:opacity-80 cursor-pointer shadow-xs border border-amber-500/30"></div>
+          <div class="w-3 h-3 rounded-full bg-emerald-500 hover:opacity-80 cursor-pointer shadow-xs border border-emerald-600/30"></div>
+        </div>
+
+        <div class="flex items-center gap-2 pl-2">
+          <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Framed%20picture/3D/framed_picture_3d.png" class="w-5 h-5 object-contain" alt="Neural Gallery">
+          <span class="text-xs font-bold tracking-tight" style="color: var(--text-main);">Neural Gallery</span>
+          <span class="text-[10px] font-mono px-1.5 py-0.5 rounded-full border flex items-center gap-1" style="background: rgba(16, 185, 129, 0.1); color: #059669; border-color: rgba(16, 185, 129, 0.25);">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Vault Unlocked</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Mode Switcher (Timeline, Explorer, Places Map) -->
+      <div id="topModeSwitch" class="flex items-center p-0.5 rounded-lg border shadow-xs" style="background: var(--pill-bg); border-color: var(--pill-border);">
+        <button id="btnTimelineMode" onclick="switchView('timeline')" class="mode-switch-btn active px-3 py-1 rounded-md text-xs transition-all flex items-center gap-1.5 cursor-pointer">
+          <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Framed%20picture/3D/framed_picture_3d.png" class="w-3.5 h-3.5 object-contain" alt="Timeline">
+          <span>Timeline</span>
+          <span class="text-[9px] opacity-70 font-mono">⌘1</span>
+        </button>
+        <button id="btnExplorerMode" onclick="switchView('explorer')" class="mode-switch-btn inactive px-3 py-1 rounded-md text-xs transition-all flex items-center gap-1.5 cursor-pointer">
+          <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Compass/3D/compass_3d.png" class="w-3.5 h-3.5 object-contain" alt="Explorer">
+          <span>Explorer & Triage</span>
+          <span class="text-[9px] opacity-70 font-mono">⌘2</span>
+        </button>
+        <button id="btnPlacesMode" onclick="switchView('places')" class="mode-switch-btn inactive px-3 py-1 rounded-md text-xs transition-all flex items-center gap-1.5 cursor-pointer">
+          <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/World%20map/3D/world_map_3d.png" class="w-3.5 h-3.5 object-contain" alt="Places Map">
+          <span>Places & Geography</span>
+          <span class="text-[9px] opacity-70 font-mono">⌘3</span>
+        </button>
+      </div>
+
+      <!-- Right Header Actions (Sync, ANE, Theme, Lock) -->
+      <div class="flex items-center gap-2">
+        <!-- P2P Wi-Fi Sync Indicator -->
+        <div class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono border" style="background: var(--badge-neutral-bg); border-color: var(--badge-neutral-border); color: var(--text-secondary);" title="P2P Local Wi-Fi Mesh (_photovault._tcp.local) - Zero Cloud Egress">
+          <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Antenna%20bars/3D/antenna_bars_3d.png" class="w-3.5 h-3.5 object-contain" alt="P2P Sync">
+          <span>P2P Sync</span>
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+        </div>
+
+        <!-- ANE Acceleration Badge -->
+        <div class="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono border" style="background: var(--badge-neutral-bg); border-color: var(--badge-neutral-border); color: var(--text-secondary);">
+          <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Sparkles/3D/sparkles_3d.png" class="w-3.5 h-3.5 object-contain" alt="ANE Ready">
+          <span>ANE: 2.1ms</span>
+        </div>
+
+        <!-- Light/Dark Mode Switcher -->
+        <button onclick="toggleTheme()" class="p-1.5 rounded-lg border transition-all cursor-pointer" style="background: var(--btn-ghost-bg); border-color: var(--btn-ghost-border);" title="Toggle Obsidian Dark / Apple Light Theme">
+          <img id="themeIcon" src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Crescent%20moon/3D/crescent_moon_3d.png" class="w-4 h-4 object-contain" alt="Theme">
+        </button>
+
+        <!-- Lock Vault Button -->
+        <button onclick="lockVault()" class="px-2.5 py-1 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-all cursor-pointer" style="background: var(--btn-ghost-bg); border-color: var(--btn-ghost-border); color: var(--text-secondary);" title="Lock Vault (Cmd+L)">
+          <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Locked/3D/locked_3d.png" class="w-3.5 h-3.5 object-contain" alt="Lock">
+          <span class="hidden sm:inline">Lock</span>
+          <span class="text-[9px] font-mono opacity-70">⌘L</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ========================================================================
+         MAIN APPLICATION BODY (SIDEBAR + WORKSPACE + LIVE INSPECTOR)
+         ======================================================================== -->
+    <div class="flex-1 flex overflow-hidden">
+      
+      <!-- ======================================================================
+           SIDEBAR WITH SEMI-SUBCATEGORIES (APPLE PHOTOS & GOOGLE PHOTOS ALIGNED)
+           ====================================================================== -->
+      <aside id="appSidebar" class="w-64 glass-sidebar flex flex-col justify-between p-3 select-none overflow-y-auto custom-scroll shrink-0">
+        <div class="space-y-4">
+          
+          <!-- Group 1: Photos Library -->
+          <div>
+            <p class="text-[10px] font-semibold uppercase tracking-wider px-2 mb-1.5 font-mono" style="color: var(--text-muted);">Library</p>
+            <nav class="space-y-0.5 text-xs font-medium">
+              <!-- All Photos -->
+              <button onclick="selectCategory('all', this)" class="category-btn active-category w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+                <span class="flex items-center gap-2.5">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Framed%20picture/3D/framed_picture_3d.png" class="w-4 h-4 object-contain" alt="All Photos">
+                  <span>All Photos</span>
+                </span>
+                <span class="text-[11px] font-mono" style="color: var(--text-muted);" id="cntAll">1,824</span>
+              </button>
+
+              <!-- Favorites -->
+              <button onclick="selectCategory('favorites', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+                <span class="flex items-center gap-2.5">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Red%20heart/3D/red_heart_3d.png" class="w-4 h-4 object-contain" alt="Favorites">
+                  <span>Favorites</span>
+                </span>
+                <span class="text-[11px] font-mono font-bold text-rose-500" id="cntFavorites">142</span>
+              </button>
+
+              <!-- Recents -->
+              <button onclick="selectCategory('recents', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+                <span class="flex items-center gap-2.5">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Stopwatch/3D/stopwatch_3d.png" class="w-4 h-4 object-contain" alt="Recents">
+                  <span>Recents</span>
+                </span>
+                <span class="text-[11px] font-mono" style="color: var(--text-muted);">48</span>
+              </button>
+            </nav>
+          </div>
+
+          <!-- Group 2: Sharing (Apple Photos & Android Photos Shared Category) -->
+          <div>
+            <div class="flex items-center justify-between px-2 mb-1.5">
+              <p class="text-[10px] font-semibold uppercase tracking-wider font-mono" style="color: var(--text-muted);">Sharing</p>
+              <span class="text-[9px] font-mono text-emerald-600 font-bold">P2P Active</span>
+            </div>
+            <nav class="space-y-0.5 text-xs font-medium">
+              <!-- Shared Albums -->
+              <button onclick="selectCategory('shared-albums', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+                <span class="flex items-center gap-2.5">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/File%20folder/3D/file_folder_3d.png" class="w-4 h-4 object-contain" alt="Shared Albums">
+                  <span>Shared Albums</span>
+                </span>
+                <span class="text-[11px] font-mono text-blue-600 font-bold">4 albums</span>
+              </button>
+
+              <!-- Shared with You -->
+              <button onclick="selectCategory('shared-with-you', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+                <span class="flex items-center gap-2.5">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Globe%20with%20meridians/3D/globe_with_meridians_3d.png" class="w-4 h-4 object-contain" alt="Shared with You">
+                  <span>Shared with You</span>
+                </span>
+                <span class="text-[11px] font-mono" style="color: var(--text-muted);">19</span>
+              </button>
+
+              <!-- Partner Sharing (Android Google Photos feature) -->
+              <button onclick="selectCategory('partner-sharing', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+                <span class="flex items-center gap-2.5">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Handshake/3D/handshake_3d.png" class="w-4 h-4 object-contain" alt="Partner Sharing">
+                  <span>Partner Sharing</span>
+                </span>
+                <span class="text-[10px] font-mono text-emerald-600">Maya</span>
+              </button>
+
+              <!-- P2P Local Mesh Direct Sync -->
+              <button onclick="selectCategory('p2p-mesh', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+                <span class="flex items-center gap-2.5">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Antenna%20bars/3D/antenna_bars_3d.png" class="w-4 h-4 object-contain" alt="P2P Mesh">
+                  <span>P2P Direct Mesh</span>
+                </span>
+                <span class="text-[9px] font-mono text-indigo-500">Zero Cloud</span>
+              </button>
+            </nav>
+          </div>
+
+          <!-- Group 3: People, Pets & Travel -->
+          <div>
+            <p class="text-[10px] font-semibold uppercase tracking-wider px-2 mb-1.5 font-mono" style="color: var(--text-muted);">People, Pets & Travel</p>
+            <nav class="space-y-0.5 text-xs font-medium">
+              <!-- People -->
+              <button onclick="selectCategory('people', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+                <span class="flex items-center gap-2.5">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Busts%20in%20silhouette/3D/busts_in_silhouette_3d.png" class="w-4 h-4 object-contain" alt="People">
+                  <span>People</span>
+                </span>
+                <span class="text-[11px] font-mono text-purple-600 font-bold">23 people</span>
+              </button>
+
+              <!-- Pets & Animals (User Requested Category) -->
+              <button onclick="selectCategory('pets', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+                <span class="flex items-center gap-2.5">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Paw%20prints/3D/paw_prints_3d.png" class="w-4 h-4 object-contain" alt="Pets & Animals">
+                  <span>Pets & Animals</span>
+                </span>
+                <span class="text-[11px] font-mono text-amber-600 font-bold">4 pets</span>
+              </button>
+
+              <!-- Travel & Trips (User Requested Category) -->
+              <button onclick="selectCategory('travel', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+                <span class="flex items-center gap-2.5">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Airplane/3D/airplane_3d.png" class="w-4 h-4 object-contain" alt="Travel & Trips">
+                  <span>Travel & Trips</span>
+                </span>
+                <span class="text-[11px] font-mono text-sky-600 font-bold">8 trips</span>
+              </button>
+
+              <!-- Places Map & Geography Location (User Requested) -->
+              <button onclick="selectCategory('places', this); switchView('places')" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+                <span class="flex items-center gap-2.5">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/World%20map/3D/world_map_3d.png" class="w-4 h-4 object-contain" alt="Places Map">
+                  <span>Places Map</span>
+                </span>
+                <span class="text-[11px] font-mono text-emerald-600 font-bold">14 cities</span>
+              </button>
+            </nav>
+          </div>
+
+          <!-- Group 4: Media Types (With Collapsible Semi-Subcategories) -->
+          <div>
+            <div class="flex items-center justify-between px-2 mb-1.5 cursor-pointer" onclick="toggleCollapse('mediaTypesTree', 'chevronMedia')">
+              <p class="text-[10px] font-semibold uppercase tracking-wider font-mono" style="color: var(--text-muted);">Media Types</p>
+              <svg id="chevronMedia" class="w-3.5 h-3.5 chevron-arrow rotated" style="color: var(--text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+              </svg>
+            </div>
+
+            <nav id="mediaTypesTree" class="space-y-0.5 text-xs font-medium">
+              
+              <!-- Parent Videos Semi-Subcategory with Collapse -->
+              <div>
+                <div class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg category-btn cursor-pointer" onclick="toggleCollapse('videosSubTree', 'chevronVideos'); selectCategory('videos', this)">
+                  <span class="flex items-center gap-2">
+                    <svg id="chevronVideos" class="w-3 h-3 chevron-arrow rotated" style="color: var(--text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Video%20camera/3D/video_camera_3d.png" class="w-4 h-4 object-contain" alt="Videos">
+                    <span class="font-semibold">Videos</span>
+                  </span>
+                  <span class="text-[11px] font-mono" style="color: var(--text-muted);">94</span>
+                </div>
+
+                <!-- Nested Sub-items under Videos -->
+                <div id="videosSubTree" class="sub-tree space-y-0.5 my-0.5">
+                  <button onclick="selectCategory('videos', this)" class="category-btn w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px]">
+                    <span class="flex items-center gap-2">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Clapper%20board/3D/clapper_board_3d.png" class="w-3.5 h-3.5 object-contain" alt="ProRes">
+                      <span>Cinematic & 4K ProRes</span>
+                    </span>
+                    <span class="font-mono text-[10px]" style="color: var(--text-muted);">28</span>
+                  </button>
+                  
+                  <button onclick="selectCategory('slomo', this)" class="category-btn w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px]">
+                    <span class="flex items-center gap-2">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Snail/3D/snail_3d.png" class="w-3.5 h-3.5 object-contain" alt="Slo-mo">
+                      <span>Slo-mo</span>
+                    </span>
+                    <span class="font-mono text-[10px]" style="color: var(--text-muted);">12</span>
+                  </button>
+
+                  <button onclick="selectCategory('timelapse', this)" class="category-btn w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px]">
+                    <span class="flex items-center gap-2">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Hourglass%20done/3D/hourglass_done_3d.png" class="w-3.5 h-3.5 object-contain" alt="Time-lapse">
+                      <span>Time-lapse</span>
+                    </span>
+                    <span class="font-mono text-[10px]" style="color: var(--text-muted);">9</span>
+                  </button>
+
+                  <button onclick="selectCategory('screen-recordings', this)" class="category-btn w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px]">
+                    <span class="flex items-center gap-2">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Play%20button/3D/play_button_3d.png" class="w-3.5 h-3.5 object-contain" alt="Screen Recordings">
+                      <span>Screen Recordings</span>
+                    </span>
+                    <span class="font-mono text-[10px]" style="color: var(--text-muted);">15</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Screenshots (User Requested) -->
+              <button onclick="selectCategory('screenshots', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+                <span class="flex items-center gap-2.5">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Mobile%20phone/3D/mobile_phone_3d.png" class="w-4 h-4 object-contain" alt="Screenshots">
+                  <span>Screenshots</span>
+                </span>
+                <span class="text-[11px] font-mono text-cyan-600 font-bold" id="cntScreenshots">84</span>
+              </button>
+
+              <!-- Selfies (Apple Photos & Google Photos Category) -->
+              <button onclick="selectCategory('selfies', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+                <span class="flex items-center gap-2.5">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Camera%20with%20flash/3D/camera_with_flash_3d.png" class="w-4 h-4 object-contain" alt="Selfies">
+                  <span>Selfies</span>
+                </span>
+                <span class="text-[11px] font-mono" style="color: var(--text-muted);">42</span>
+              </button>
+
+              <!-- Portraits (Depth) -->
+              <button onclick="selectCategory('portraits', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+                <span class="flex items-center gap-2.5">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Bust%20in%20silhouette/3D/bust_in_silhouette_3d.png" class="w-4 h-4 object-contain" alt="Portraits">
+                  <span>Portraits (Depth)</span>
+                </span>
+                <span class="text-[11px] font-mono" style="color: var(--text-muted);">312</span>
+              </button>
+
+              <!-- Live Photos -->
+              <button onclick="selectCategory('live-photos', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+                <span class="flex items-center gap-2.5">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Cyclone/3D/cyclone_3d.png" class="w-4 h-4 object-contain" alt="Live Photos">
+                  <span>Live Photos</span>
+                </span>
+                <span class="text-[11px] font-mono" style="color: var(--text-muted);">540</span>
+              </button>
+
+              <!-- Apple ProRAW / DNG -->
+              <button onclick="selectCategory('raw', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+                <span class="flex items-center gap-2.5">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Gem%20stone/3D/gem_stone_3d.png" class="w-4 h-4 object-contain" alt="Apple ProRAW">
+                  <span>Apple ProRAW / DNG</span>
+                </span>
+                <span class="text-[11px] font-mono" style="color: var(--text-muted);">118</span>
+              </button>
+
+              <!-- Panoramas -->
+              <button onclick="selectCategory('panoramas', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+                <span class="flex items-center gap-2.5">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Sunrise/3D/sunrise_3d.png" class="w-4 h-4 object-contain" alt="Panoramas">
+                  <span>Panoramas</span>
+                </span>
+                <span class="text-[11px] font-mono" style="color: var(--text-muted);">19</span>
+              </button>
+
+              <!-- Animated / GIFs -->
+              <button onclick="selectCategory('animated', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+                <span class="flex items-center gap-2.5">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Film%20frames/3D/film_frames_3d.png" class="w-4 h-4 object-contain" alt="Animated">
+                  <span>Animated & GIFs</span>
+                </span>
+                <span class="text-[11px] font-mono" style="color: var(--text-muted);">24</span>
+              </button>
+            </nav>
+          </div>
+
+          <!-- Group 5: Utilities (User Requested: Duplicates Inside Utilities as Semi-Subcategory) -->
+          <div>
+            <div class="flex items-center justify-between px-2 mb-1.5 cursor-pointer" onclick="toggleCollapse('utilitiesTree', 'chevronUtilities')">
+              <div class="flex items-center gap-1.5">
+                <svg id="chevronUtilities" class="w-3.5 h-3.5 chevron-arrow rotated" style="color: var(--text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+                <p class="text-[10px] font-semibold uppercase tracking-wider font-mono" style="color: var(--text-muted);">Utilities</p>
+              </div>
+              <span class="text-[9px] font-mono" style="color: var(--text-faint);">Triage Keys K/N</span>
+            </div>
+            
+            <!-- Utilities Semi-Subcategory Tree -->
+            <nav id="utilitiesTree" class="sub-tree space-y-0.5 text-xs font-medium">
+              
+              <!-- Near Duplicates (INSIDE UTILITIES PER USER REQUEST) -->
+              <button onclick="selectCategory('duplicates', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+                <span class="flex items-center gap-2">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Repeat%20button/3D/repeat_button_3d.png" class="w-4 h-4 object-contain" alt="Near Duplicates">
+                  <span class="font-semibold">Duplicates</span>
+                </span>
+                <span class="text-[11px] font-mono text-indigo-600 font-bold" id="cntDuplicates">36 groups</span>
+              </button>
+
+              <!-- To Sort (Inbox) -->
+              <button onclick="selectCategory('inbox', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+                <span class="flex items-center gap-2">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Inbox%20tray/3D/inbox_tray_3d.png" class="w-4 h-4 object-contain" alt="To sort">
+                  <span>To sort (Inbox)</span>
+                </span>
+                <span class="text-[11px] font-mono font-bold text-amber-600" id="cntInbox">412</span>
+              </button>
+
+              <!-- Receipts & Documents (OCR) -->
+              <button onclick="selectCategory('documents', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+                <span class="flex items-center gap-2">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Page%20facing%20up/3D/page_facing_up_3d.png" class="w-4 h-4 object-contain" alt="Documents">
+                  <span>Receipts & Documents</span>
+                </span>
+                <span class="text-[11px] font-mono" style="color: var(--text-muted);">62</span>
+              </button>
+
+              <!-- Hidden & Locked Vault -->
+              <button onclick="selectCategory('hidden', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+                <span class="flex items-center gap-2">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Locked/3D/locked_3d.png" class="w-4 h-4 object-contain" alt="Hidden">
+                  <span>Hidden / Locked</span>
+                </span>
+                <span class="text-[10px] font-mono text-purple-600">Encrypted</span>
+              </button>
+
+              <!-- Imports & SD Card -->
+              <button onclick="selectCategory('imports', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+                <span class="flex items-center gap-2">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Card%20file%20box/3D/card_file_box_3d.png" class="w-4 h-4 object-contain" alt="Imports">
+                  <span>Imports & SD Cards</span>
+                </span>
+                <span class="text-[11px] font-mono" style="color: var(--text-muted);">240</span>
+              </button>
+
+              <!-- Low Quality & Blurs (Triage) -->
+              <button onclick="selectCategory('low-quality', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg">
+                <span class="flex items-center gap-2">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Wrench/3D/wrench_3d.png" class="w-4 h-4 object-contain" alt="Low Quality">
+                  <span>Low Quality & Blurs</span>
+                </span>
+                <span class="text-[11px] font-mono text-rose-500 font-bold">88</span>
+              </button>
+
+              <!-- Recently Deleted / Finder Trash -->
+              <button onclick="selectCategory('trash', this)" class="category-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg" style="color: #e11d48;">
+                <span class="flex items-center gap-2">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Wastebasket/3D/wastebasket_3d.png" class="w-4 h-4 object-contain" alt="Trash">
+                  <span>Recently Deleted</span>
+                </span>
+                <span class="text-[11px] font-mono font-bold">14</span>
+              </button>
+            </nav>
+          </div>
+
+        </div>
+
+        <!-- Sidebar Footer: Storage & Local Hardware Enclave Privacy -->
+        <div class="mt-3 pt-2.5 border-t space-y-1.5" style="border-color: var(--sidebar-border);">
+          <div class="p-2 rounded-lg flex items-center justify-between text-[11px] font-mono border" style="background: var(--card-bg); border-color: var(--card-border);">
+            <div class="flex items-center gap-2">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Shield/3D/shield_3d.png" class="w-4 h-4 object-contain" alt="Security">
+              <div>
+                <p class="font-bold text-[10px]" style="color: var(--text-main);">Zero Cloud Egress</p>
+                <p class="text-[9px]" style="color: var(--text-muted);">Local NVMe Only</p>
+              </div>
+            </div>
+            <span class="text-[9px] text-emerald-600 font-bold">100% On-Device</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- ======================================================================
+           WORKSPACE (TIMELINE, EXPLORER, OR PLACES MAP)
+           ====================================================================== -->
+      <main class="flex-1 flex flex-col overflow-hidden" style="background: var(--main-bg);">
+        
+        <!-- Search & Quick Filter Pills Bar -->
+        <div class="p-3 border-b space-y-2 shrink-0 select-none" style="border-color: var(--sub-bar-border); background: var(--sub-bar-bg);">
+          
+          <!-- Natural Language Search Bar (MobileCLIP-B/16 CoreML) -->
+          <div class="relative flex items-center">
+            <div class="absolute left-3.5 pointer-events-none flex items-center gap-1.5">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Magnifying%20glass%20tilted%20left/3D/magnifying_glass_tilted_left_3d.png" class="w-4 h-4 object-contain" alt="Search">
+            </div>
+            <input type="text" id="searchInput" oninput="filterPhotos()" placeholder="Natural Language Search: 'tokyo rainy street neon', 'golden retriever on grass', 'receipt over $50', 'raw portraits'..." class="w-full pl-10 pr-24 py-2 rounded-xl text-xs font-mono transition-all shadow-inner border focus:outline-hidden" style="background: var(--input-bg); border-color: var(--input-border); color: var(--input-text);">
+            <div class="absolute right-3 flex items-center gap-1.5 text-[10px] font-mono" style="color: var(--text-muted);">
+              <span class="px-1.5 py-0.5 rounded border" style="background: var(--badge-neutral-bg); border-color: var(--badge-neutral-border);">ANE: 2.1ms</span>
+              <span class="px-1 py-0.5 rounded border" style="background: var(--badge-neutral-bg); border-color: var(--badge-neutral-border);">⌘F</span>
+            </div>
+          </div>
+
+          <!-- Quick Filter Pills: All, Favorites, Duplicates, To sort, Videos, Screenshots, Pets, Travel, Places Map, Portraits, Live Photos, ProRAW, Shared, Documents -->
+          <div class="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scroll text-xs">
+            <button onclick="selectCategory('all', this)" class="filter-pill active-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Framed%20picture/3D/framed_picture_3d.png" class="w-3.5 h-3.5 object-contain" alt="All">
+              <span>All</span>
+            </button>
+
+            <!-- Favorites Filter Pill -->
+            <button onclick="selectCategory('favorites', this)" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Red%20heart/3D/red_heart_3d.png" class="w-3.5 h-3.5 object-contain" alt="Favorites">
+              <span>Favorites</span>
+            </button>
+
+            <!-- Duplicates Filter Pill (In Utility) -->
+            <button onclick="selectCategory('duplicates', this)" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Repeat%20button/3D/repeat_button_3d.png" class="w-3.5 h-3.5 object-contain" alt="Duplicates">
+              <span>Duplicates (Utility)</span>
+            </button>
+
+            <!-- To Sort Filter Pill -->
+            <button onclick="selectCategory('inbox', this)" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Inbox%20tray/3D/inbox_tray_3d.png" class="w-3.5 h-3.5 object-contain" alt="To sort">
+              <span>To sort</span>
+            </button>
+
+            <!-- Videos Filter Pill -->
+            <button onclick="selectCategory('videos', this)" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Video%20camera/3D/video_camera_3d.png" class="w-3.5 h-3.5 object-contain" alt="Videos">
+              <span>Videos</span>
+            </button>
+
+            <!-- Screenshots Filter Pill -->
+            <button onclick="selectCategory('screenshots', this)" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Mobile%20phone/3D/mobile_phone_3d.png" class="w-3.5 h-3.5 object-contain" alt="Screenshots">
+              <span>Screenshots</span>
+            </button>
+
+            <!-- Pets Filter Pill -->
+            <button onclick="selectCategory('pets', this)" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Paw%20prints/3D/paw_prints_3d.png" class="w-3.5 h-3.5 object-contain" alt="Pets">
+              <span>Pets</span>
+            </button>
+
+            <!-- Travel Filter Pill -->
+            <button onclick="selectCategory('travel', this)" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Airplane/3D/airplane_3d.png" class="w-3.5 h-3.5 object-contain" alt="Travel">
+              <span>Travel</span>
+            </button>
+
+            <!-- Places Map Filter Pill -->
+            <button onclick="selectCategory('places', this); switchView('places')" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/World%20map/3D/world_map_3d.png" class="w-3.5 h-3.5 object-contain" alt="Places Map">
+              <span>Places Map</span>
+            </button>
+
+            <!-- Portraits Filter Pill -->
+            <button onclick="selectCategory('portraits', this)" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Bust%20in%20silhouette/3D/bust_in_silhouette_3d.png" class="w-3.5 h-3.5 object-contain" alt="Portraits">
+              <span>Portraits</span>
+            </button>
+
+            <!-- Live Photos Filter Pill -->
+            <button onclick="selectCategory('live-photos', this)" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Cyclone/3D/cyclone_3d.png" class="w-3.5 h-3.5 object-contain" alt="Live Photos">
+              <span>Live Photos</span>
+            </button>
+
+            <!-- Apple ProRAW Filter Pill -->
+            <button onclick="selectCategory('raw', this)" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Gem%20stone/3D/gem_stone_3d.png" class="w-3.5 h-3.5 object-contain" alt="ProRAW">
+              <span>Apple ProRAW</span>
+            </button>
+
+            <!-- Shared Filter Pill -->
+            <button onclick="selectCategory('shared-albums', this)" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Globe%20with%20meridians/3D/globe_with_meridians_3d.png" class="w-3.5 h-3.5 object-contain" alt="Shared">
+              <span>Shared</span>
+            </button>
+
+            <!-- Documents Filter Pill -->
+            <button onclick="selectCategory('documents', this)" class="filter-pill px-3 py-1 rounded-full flex items-center gap-1.5 cursor-pointer">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Page%20facing%20up/3D/page_facing_up_3d.png" class="w-3.5 h-3.5 object-contain" alt="Documents">
+              <span>Documents</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- ====================================================================
+             VIEW 1: TIMELINE MODE (APPLE PHOTOS NATIVE GRID)
+             ==================================================================== -->
+        <div id="viewTimeline" class="flex-1 flex flex-col overflow-hidden">
+          
+          <!-- People & Pets Face Strip Carousel -->
+          <div id="peopleFaceStrip" class="px-4 py-2.5 border-b flex items-center gap-3 overflow-x-auto custom-scroll shrink-0 select-none" style="border-color: var(--sub-bar-border); background: var(--header-bg);">
+            <div class="flex items-center gap-1.5 shrink-0 pr-2 border-r" style="border-color: var(--tree-line);">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Busts%20in%20silhouette/3D/busts_in_silhouette_3d.png" class="w-4 h-4 object-contain" alt="People & Pets">
+              <span class="text-[11px] font-bold tracking-tight" style="color: var(--text-main);">People & Pets</span>
+            </div>
+
+            <!-- Face 1: Eleanor -->
+            <button onclick="filterPerson('Eleanor')" class="flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all hover:scale-105 shrink-0 cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">
+              <div class="w-5 h-5 rounded-full bg-gradient-to-tr from-amber-400 to-rose-400 border border-white/60"></div>
+              <span class="text-xs font-medium" style="color: var(--text-main);">Eleanor</span>
+              <span class="text-[10px] font-mono" style="color: var(--text-muted);">142</span>
+            </button>
+
+            <!-- Face 2: Sarah -->
+            <button onclick="filterPerson('Sarah')" class="flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all hover:scale-105 shrink-0 cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">
+              <div class="w-5 h-5 rounded-full bg-gradient-to-tr from-sky-400 to-indigo-500 border border-white/60"></div>
+              <span class="text-xs font-medium" style="color: var(--text-main);">Sarah</span>
+              <span class="text-[10px] font-mono" style="color: var(--text-muted);">98</span>
+            </button>
+
+            <!-- Face 3: Marcus -->
+            <button onclick="filterPerson('Marcus')" class="flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all hover:scale-105 shrink-0 cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">
+              <div class="w-5 h-5 rounded-full bg-gradient-to-tr from-emerald-400 to-teal-600 border border-white/60"></div>
+              <span class="text-xs font-medium" style="color: var(--text-main);">Marcus</span>
+              <span class="text-[10px] font-mono" style="color: var(--text-muted);">84</span>
+            </button>
+
+            <!-- Face 4: Maya -->
+            <button onclick="filterPerson('Maya')" class="flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all hover:scale-105 shrink-0 cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">
+              <div class="w-5 h-5 rounded-full bg-gradient-to-tr from-pink-400 to-purple-600 border border-white/60"></div>
+              <span class="text-xs font-medium" style="color: var(--text-main);">Maya</span>
+              <span class="text-[10px] font-mono" style="color: var(--text-muted);">76</span>
+            </button>
+
+            <!-- Pet 1: Milo (Golden Retriever) -->
+            <button onclick="filterPerson('Milo')" class="flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all hover:scale-105 shrink-0 cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Dog%20face/3D/dog_face_3d.png" class="w-4 h-4 object-contain" alt="Milo">
+              <span class="text-xs font-medium" style="color: var(--text-main);">Milo (Dog)</span>
+              <span class="text-[10px] font-mono text-amber-600 font-bold">54</span>
+            </button>
+
+            <!-- Pet 2: Luna (Tabby Cat) -->
+            <button onclick="filterPerson('Luna')" class="flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all hover:scale-105 shrink-0 cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Cat%20face/3D/cat_face_3d.png" class="w-4 h-4 object-contain" alt="Luna">
+              <span class="text-xs font-medium" style="color: var(--text-main);">Luna (Cat)</span>
+              <span class="text-[10px] font-mono text-indigo-500 font-bold">38</span>
+            </button>
+
+            <!-- Face 5: Kai -->
+            <button onclick="filterPerson('Kai')" class="flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all hover:scale-105 shrink-0 cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">
+              <div class="w-5 h-5 rounded-full bg-gradient-to-tr from-orange-400 to-amber-500 border border-white/60"></div>
+              <span class="text-xs font-medium" style="color: var(--text-main);">Kai</span>
+              <span class="text-[10px] font-mono" style="color: var(--text-muted);">42</span>
+            </button>
+
+            <!-- Unnamed Cluster -->
+            <button onclick="filterPerson('unnamed')" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-dashed transition-all hover:scale-105 shrink-0 cursor-pointer" style="background: rgba(0,0,0,0.02); border-color: var(--text-faint);">
+              <span class="text-xs" style="color: var(--text-muted);">+ Unnamed Cluster</span>
+              <span class="text-[10px] font-mono" style="color: var(--text-muted);">12</span>
+            </button>
+          </div>
+
+          <!-- Timeline Photo Grid -->
+          <div class="flex-1 overflow-y-auto p-4 custom-scroll" id="photoGridContainer">
+            
+            <!-- Date Section 1: Today / October 2026 -->
+            <div class="mb-6">
+              <div class="flex items-center justify-between mb-3 px-1">
+                <div class="flex items-baseline gap-2">
+                  <h3 class="text-sm font-bold tracking-tight" style="color: var(--text-main);">Today · Saturday, Oct 24, 2026</h3>
+                  <span class="text-xs font-mono" style="color: var(--text-muted);">Tokyo & San Francisco · 12 items</span>
+                </div>
+                <div class="flex items-center gap-2 text-xs font-mono" style="color: var(--text-muted);">
+                  <button onclick="setTimelineZoom('days')" class="px-2 py-0.5 rounded hover:bg-black/5">Days</button>
+                  <button onclick="setTimelineZoom('months')" class="px-2 py-0.5 rounded hover:bg-black/5">Months</button>
+                  <button onclick="setTimelineZoom('years')" class="px-2 py-0.5 rounded hover:bg-black/5">Years</button>
+                </div>
+              </div>
+
+              <!-- Responsive Photo Grid with 12 Representative Cards -->
+              <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3" id="photoCardsGrid">
+                
+                <!-- CARD 1: Near Duplicate in Utility (Tokyo Street Night) -->
+                <div onclick="selectCard(this, 'IMG_4920.DNG', '7008x4672', '58.4 MB', 'Sony α7 IV', 'f/2.8', '1/1000s', '100', '35.6764° N, 139.6500° E', true, false, 'Tokyo, Japan', 'travel,duplicates,raw')" 
+                     class="photo-card active-card glass-card group relative aspect-square rounded-xl overflow-hidden cursor-pointer" 
+                     data-tags="tokyo rainy street neon night duplicate raw travel" 
+                     data-category="duplicates" 
+                     data-favorite="false">
+                  <div class="absolute inset-0 bg-gradient-to-tr from-amber-600/70 via-orange-500/50 to-indigo-600/60 group-hover:scale-105 transition-transform duration-300"></div>
+                  
+                  <div class="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold shadow-xs border flex items-center gap-1 backdrop-blur-md" style="background: rgba(255, 255, 255, 0.92); color: #4338ca; border-color: rgba(99, 102, 241, 0.3);">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Repeat%20button/3D/repeat_button_3d.png" class="w-3 h-3 object-contain" alt="Dup">
+                      <span>Duplicate #D-104</span>
+                    </span>
+                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded font-medium shadow-xs border backdrop-blur-md flex items-center gap-1" style="background: rgba(255, 255, 255, 0.92); color: #047857; border-color: rgba(16, 185, 129, 0.3);">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Sparkles/3D/sparkles_3d.png" class="w-3 h-3 object-contain" alt="Keep">
+                      <span>9.6 / 10 Score</span>
+                    </span>
+                  </div>
+
+                  <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white text-[10px] font-mono drop-shadow-md">
+                    <span class="truncate">Tokyo Shibuya Neon</span>
+                    <span>DNG</span>
+                  </div>
+                </div>
+
+                <!-- CARD 2: Video 4K ProRes Cinematic (Tokyo Express) -->
+                <div onclick="selectCard(this, 'MOV_8392.MOV', '3840x2160', '842.1 MB', 'iPhone 16 Pro Max', 'f/1.78', '1/60s', '80', '35.6895° N, 139.6917° E', false, true, 'Tokyo, Japan', 'videos,cinematic')" 
+                     class="photo-card glass-card group relative aspect-square rounded-xl overflow-hidden cursor-pointer" 
+                     data-tags="tokyo train station video 4k prores cinematic movement" 
+                     data-category="videos" 
+                     data-favorite="true">
+                  <div class="absolute inset-0 bg-gradient-to-tr from-sky-600/70 via-blue-700/60 to-purple-800/60 group-hover:scale-105 transition-transform duration-300"></div>
+                  
+                  <div class="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold shadow-xs border flex items-center gap-1 backdrop-blur-md" style="background: rgba(255, 255, 255, 0.92); color: #0284c7; border-color: rgba(2, 132, 199, 0.3);">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Clapper%20board/3D/clapper_board_3d.png" class="w-3 h-3 object-contain" alt="Video">
+                      <span>4K ProRes · 0:42</span>
+                    </span>
+                  </div>
+
+                  <div class="absolute top-2 right-2">
+                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Red%20heart/3D/red_heart_3d.png" class="w-4 h-4 object-contain drop-shadow" alt="Favorited">
+                  </div>
+
+                  <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white text-[10px] font-mono drop-shadow-md">
+                    <span class="truncate">Shinkansen Nozomi</span>
+                    <span>4K 60fps</span>
+                  </div>
+                </div>
+
+                <!-- CARD 3: Pet (Milo the Golden Retriever) -->
+                <div onclick="selectCard(this, 'IMG_2048.HEIC', '4032x3024', '4.2 MB', 'iPhone 16 Pro', 'f/1.8', '1/500s', '64', '37.7749° N, 122.4194° W', false, true, 'San Francisco, CA', 'pets,portraits')" 
+                     class="photo-card glass-card group relative aspect-square rounded-xl overflow-hidden cursor-pointer" 
+                     data-tags="dog pet milo golden retriever grass park animal" 
+                     data-category="pets" 
+                     data-favorite="true">
+                  <div class="absolute inset-0 bg-gradient-to-tr from-amber-400/80 via-yellow-500/60 to-emerald-600/50 group-hover:scale-105 transition-transform duration-300"></div>
+                  
+                  <div class="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold shadow-xs border flex items-center gap-1 backdrop-blur-md" style="background: rgba(255, 255, 255, 0.92); color: #d97706; border-color: rgba(217, 119, 6, 0.3);">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Dog%20face/3D/dog_face_3d.png" class="w-3 h-3 object-contain" alt="Dog">
+                      <span>Milo (Golden)</span>
+                    </span>
+                  </div>
+
+                  <div class="absolute top-2 right-2">
+                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Red%20heart/3D/red_heart_3d.png" class="w-4 h-4 object-contain drop-shadow" alt="Favorited">
+                  </div>
+
+                  <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white text-[10px] font-mono drop-shadow-md">
+                    <span class="truncate">Presidio Sunny Run</span>
+                    <span>Portrait</span>
+                  </div>
+                </div>
+
+                <!-- CARD 4: Pet (Luna the Tabby Cat) -->
+                <div onclick="selectCard(this, 'IMG_3120.HEIC', '4032x3024', '3.8 MB', 'iPhone 15 Pro', 'f/1.78', '1/250s', '125', '37.7690° N, 122.4467° W', false, false, 'San Francisco, CA', 'pets,live-photos')" 
+                     class="photo-card glass-card group relative aspect-square rounded-xl overflow-hidden cursor-pointer" 
+                     data-tags="cat pet luna tabby window sunshine whiskers" 
+                     data-category="pets" 
+                     data-favorite="false">
+                  <div class="absolute inset-0 bg-gradient-to-tr from-indigo-500/70 via-purple-500/50 to-pink-500/50 group-hover:scale-105 transition-transform duration-300"></div>
+                  
+                  <div class="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold shadow-xs border flex items-center gap-1 backdrop-blur-md" style="background: rgba(255, 255, 255, 0.92); color: #7c3aed; border-color: rgba(124, 58, 237, 0.3);">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Cat%20face/3D/cat_face_3d.png" class="w-3 h-3 object-contain" alt="Cat">
+                      <span>Luna (Tabby)</span>
+                    </span>
+                    <span class="text-[9px] font-mono px-1.5 py-0.5 rounded shadow-xs border backdrop-blur-md flex items-center gap-1" style="background: rgba(255, 255, 255, 0.92); color: #4338ca; border-color: rgba(99, 102, 241, 0.3);">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Cyclone/3D/cyclone_3d.png" class="w-3 h-3 object-contain" alt="Live">
+                      <span>Live</span>
+                    </span>
+                  </div>
+
+                  <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white text-[10px] font-mono drop-shadow-md">
+                    <span class="truncate">Afternoon Sunbeam</span>
+                    <span>HEIC</span>
+                  </div>
+                </div>
+
+                <!-- CARD 5: Travel & Trips (Dolomites Italian Alps) -->
+                <div onclick="selectCard(this, 'IMG_7102.DNG', '8256x5504', '64.2 MB', 'Nikon Z8', 'f/8.0', '1/400s', '64', '46.5405° N, 12.1357° E', false, true, 'Dolomites, Italy', 'travel,raw,favorites')" 
+                     class="photo-card glass-card group relative aspect-square rounded-xl overflow-hidden cursor-pointer" 
+                     data-tags="dolomites mountains italy alps peaks hiking travel raw" 
+                     data-category="travel" 
+                     data-favorite="true">
+                  <div class="absolute inset-0 bg-gradient-to-tr from-sky-500/70 via-teal-600/50 to-emerald-700/60 group-hover:scale-105 transition-transform duration-300"></div>
+                  
+                  <div class="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold shadow-xs border flex items-center gap-1 backdrop-blur-md" style="background: rgba(255, 255, 255, 0.92); color: #0284c7; border-color: rgba(2, 132, 199, 0.3);">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Airplane/3D/airplane_3d.png" class="w-3 h-3 object-contain" alt="Travel">
+                      <span>Dolomites Hike</span>
+                    </span>
+                    <span class="text-[9px] font-mono px-1.5 py-0.5 rounded shadow-xs border backdrop-blur-md flex items-center gap-1" style="background: rgba(255, 255, 255, 0.92); color: #059669; border-color: rgba(16, 185, 129, 0.3);">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Gem%20stone/3D/gem_stone_3d.png" class="w-3 h-3 object-contain" alt="RAW">
+                      <span>45MP RAW</span>
+                    </span>
+                  </div>
+
+                  <div class="absolute top-2 right-2">
+                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Red%20heart/3D/red_heart_3d.png" class="w-4 h-4 object-contain drop-shadow" alt="Favorited">
+                  </div>
+
+                  <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white text-[10px] font-mono drop-shadow-md">
+                    <span class="truncate">Tre Cime di Lavaredo</span>
+                    <span>ISO 64</span>
+                  </div>
+                </div>
+
+                <!-- CARD 6: Travel (Yosemite Valley Half Dome) -->
+                <div onclick="selectCard(this, 'IMG_6820.DNG', '7008x4672', '52.1 MB', 'Sony α7 IV', 'f/5.6', '1/800s', '100', '37.7456° N, 119.5936° W', false, true, 'Yosemite, CA', 'travel,raw,favorites')" 
+                     class="photo-card glass-card group relative aspect-square rounded-xl overflow-hidden cursor-pointer" 
+                     data-tags="yosemite national park half dome granite cliff travel landscape" 
+                     data-category="travel" 
+                     data-favorite="true">
+                  <div class="absolute inset-0 bg-gradient-to-tr from-amber-500/60 via-stone-500/50 to-blue-600/50 group-hover:scale-105 transition-transform duration-300"></div>
+                  
+                  <div class="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold shadow-xs border flex items-center gap-1 backdrop-blur-md" style="background: rgba(255, 255, 255, 0.92); color: #d97706; border-color: rgba(217, 119, 6, 0.3);">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Round%20pushpin/3D/round_pushpin_3d.png" class="w-3 h-3 object-contain" alt="Pin">
+                      <span>Yosemite Valley</span>
+                    </span>
+                  </div>
+
+                  <div class="absolute top-2 right-2">
+                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Red%20heart/3D/red_heart_3d.png" class="w-4 h-4 object-contain drop-shadow" alt="Favorited">
+                  </div>
+
+                  <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white text-[10px] font-mono drop-shadow-md">
+                    <span class="truncate">Half Dome Sunset</span>
+                    <span>33MP RAW</span>
+                  </div>
+                </div>
+
+                <!-- CARD 7: Screenshots (Xcode Debug Session) -->
+                <div onclick="selectCard(this, 'Screenshot_20261024_1102.PNG', '3024x1964', '3.1 MB', 'macOS Sequoia 15.1', 'N/A', 'N/A', 'N/A', '37.7749° N, 122.4194° W', false, false, 'San Francisco, CA', 'screenshots')" 
+                     class="photo-card glass-card group relative aspect-square rounded-xl overflow-hidden cursor-pointer" 
+                     data-tags="screenshot code debug macos terminal xcode development" 
+                     data-category="screenshots" 
+                     data-favorite="false">
+                  <div class="absolute inset-0 bg-gradient-to-tr from-slate-800 via-gray-900 to-zinc-800 group-hover:scale-105 transition-transform duration-300 flex items-center justify-center p-3">
+                    <div class="w-full h-full rounded border border-white/10 bg-black/40 p-2 font-mono text-[8px] text-emerald-400 overflow-hidden leading-tight">
+                      <span class="text-blue-400">$</span> agy build --target ane<br>
+                      <span class="text-gray-400">[info]</span> Compiling MobileCLIP-B/16 CoreML<br>
+                      <span class="text-gray-400">[info]</span> ANE latency: 2.1ms verified<br>
+                      <span class="text-emerald-400">✓ Vault Ready</span>
+                    </div>
+                  </div>
+                  
+                  <div class="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold shadow-xs border flex items-center gap-1 backdrop-blur-md" style="background: rgba(255, 255, 255, 0.92); color: #0891b2; border-color: rgba(8, 145, 178, 0.3);">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Mobile%20phone/3D/mobile_phone_3d.png" class="w-3 h-3 object-contain" alt="Screenshot">
+                      <span>Screenshot</span>
+                    </span>
+                  </div>
+
+                  <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white text-[10px] font-mono drop-shadow-md">
+                    <span class="truncate">Xcode CoreML Compile</span>
+                    <span>PNG</span>
+                  </div>
+                </div>
+
+                <!-- CARD 8: Document / Receipt OCR (Apple Store Receipt) -->
+                <div onclick="selectCard(this, 'DOC_Receipt_8491.HEIC', '4032x3024', '2.4 MB', 'iPhone 16 Pro', 'f/1.78', '1/120s', '200', '35.6700° N, 139.7600° E', false, false, 'Ginza, Tokyo, Japan', 'documents')" 
+                     class="photo-card glass-card group relative aspect-square rounded-xl overflow-hidden cursor-pointer" 
+                     data-tags="receipt document bill ocr text purchase apple ginza" 
+                     data-category="documents" 
+                     data-favorite="false">
+                  <div class="absolute inset-0 bg-gradient-to-tr from-stone-200 via-stone-300 to-amber-100 group-hover:scale-105 transition-transform duration-300 flex items-center justify-center p-3">
+                    <div class="w-4/5 h-4/5 rounded bg-white shadow-md p-2 font-mono text-[7px] text-gray-700 leading-tight border border-gray-200">
+                      <p class="font-bold border-b pb-0.5">APPLE GINZA TOKYO</p>
+                      <p class="mt-1">Order: #W928172901</p>
+                      <p>Pro Lens Kit ¥48,000</p>
+                      <p class="font-bold mt-1 text-emerald-600">PAID · ¥48,000 JPY</p>
+                    </div>
+                  </div>
+                  
+                  <div class="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold shadow-xs border flex items-center gap-1 backdrop-blur-md" style="background: rgba(255, 255, 255, 0.92); color: #475569; border-color: rgba(71, 85, 105, 0.3);">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Page%20facing%20up/3D/page_facing_up_3d.png" class="w-3 h-3 object-contain" alt="Document">
+                      <span>Receipt OCR (¥48k)</span>
+                    </span>
+                  </div>
+
+                  <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between text-stone-800 text-[10px] font-mono drop-shadow-xs">
+                    <span class="truncate">Apple Ginza Store</span>
+                    <span>OCR Text</span>
+                  </div>
+                </div>
+
+                <!-- CARD 9: Shared Album (Family Vault / Kyoto) -->
+                <div onclick="selectCard(this, 'IMG_5190.HEIC', '4032x3024', '3.6 MB', 'iPhone 15 Pro', 'f/1.8', '1/640s', '50', '35.0116° N, 135.7681° E', false, true, 'Kyoto, Japan', 'shared-albums,travel')" 
+                     class="photo-card glass-card group relative aspect-square rounded-xl overflow-hidden cursor-pointer" 
+                     data-tags="kyoto temple bamboo garden shared family travel" 
+                     data-category="shared-albums" 
+                     data-favorite="true">
+                  <div class="absolute inset-0 bg-gradient-to-tr from-emerald-600/70 via-teal-600/50 to-lime-600/60 group-hover:scale-105 transition-transform duration-300"></div>
+                  
+                  <div class="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold shadow-xs border flex items-center gap-1 backdrop-blur-md" style="background: rgba(255, 255, 255, 0.92); color: #2563eb; border-color: rgba(37, 99, 235, 0.3);">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/File%20folder/3D/file_folder_3d.png" class="w-3 h-3 object-contain" alt="Shared">
+                      <span>Family Vault</span>
+                    </span>
+                  </div>
+
+                  <div class="absolute top-2 right-2">
+                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Red%20heart/3D/red_heart_3d.png" class="w-4 h-4 object-contain drop-shadow" alt="Favorited">
+                  </div>
+
+                  <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white text-[10px] font-mono drop-shadow-md">
+                    <span class="truncate">Kyoto Arashiyama</span>
+                    <span>Shared</span>
+                  </div>
+                </div>
+
+                <!-- CARD 10: Portrait (Sarah Depth Map) -->
+                <div onclick="selectCard(this, 'IMG_4812.HEIC', '4032x3024', '4.6 MB', 'iPhone 16 Pro', 'f/2.8', '1/320s', '80', '37.7749° N, 122.4194° W', false, true, 'San Francisco, CA', 'portraits,favorites')" 
+                     class="photo-card glass-card group relative aspect-square rounded-xl overflow-hidden cursor-pointer" 
+                     data-tags="sarah portrait bokeh depth cafe girl" 
+                     data-category="portraits" 
+                     data-favorite="true">
+                  <div class="absolute inset-0 bg-gradient-to-tr from-rose-500/60 via-pink-400/50 to-purple-600/60 group-hover:scale-105 transition-transform duration-300"></div>
+                  
+                  <div class="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold shadow-xs border flex items-center gap-1 backdrop-blur-md" style="background: rgba(255, 255, 255, 0.92); color: #e11d48; border-color: rgba(225, 29, 72, 0.3);">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Bust%20in%20silhouette/3D/bust_in_silhouette_3d.png" class="w-3 h-3 object-contain" alt="Portrait">
+                      <span>Portrait · Depth f/2.8</span>
+                    </span>
+                  </div>
+
+                  <div class="absolute top-2 right-2">
+                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Red%20heart/3D/red_heart_3d.png" class="w-4 h-4 object-contain drop-shadow" alt="Favorited">
+                  </div>
+
+                  <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white text-[10px] font-mono drop-shadow-md">
+                    <span class="truncate">Sarah at Blue Bottle</span>
+                    <span>Depth Map</span>
+                  </div>
+                </div>
+
+                <!-- CARD 11: Panorama (San Francisco Golden Gate) -->
+                <div onclick="selectCard(this, 'PANO_1082.HEIC', '12040x3840', '18.4 MB', 'iPhone 16 Pro', 'f/1.78', '1/1200s', '50', '37.8199° N, 122.4783° W', false, false, 'Marin Headlands, CA', 'panoramas')" 
+                     class="photo-card glass-card group relative aspect-square rounded-xl overflow-hidden cursor-pointer" 
+                     data-tags="panorama wide golden gate bridge san francisco marin ocean" 
+                     data-category="panoramas" 
+                     data-favorite="false">
+                  <div class="absolute inset-0 bg-gradient-to-tr from-orange-500/70 via-red-500/50 to-sky-600/60 group-hover:scale-105 transition-transform duration-300"></div>
+                  
+                  <div class="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold shadow-xs border flex items-center gap-1 backdrop-blur-md" style="background: rgba(255, 255, 255, 0.92); color: #ea580c; border-color: rgba(234, 88, 12, 0.3);">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Sunrise/3D/sunrise_3d.png" class="w-3 h-3 object-contain" alt="Pano">
+                      <span>Panorama 46MP</span>
+                    </span>
+                  </div>
+
+                  <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white text-[10px] font-mono drop-shadow-md">
+                    <span class="truncate">Golden Gate Vista</span>
+                    <span>12040×3840</span>
+                  </div>
+                </div>
+
+                <!-- CARD 12: Slo-mo Video (Pacific Coast Waves) -->
+                <div onclick="selectCard(this, 'MOV_9941.MOV', '1920x1080', '210.8 MB', 'iPhone 16 Pro', 'f/2.2', '1/1000s', '160', '36.5684° N, 121.9515° W', false, false, 'Carmel-by-the-Sea, CA', 'videos,slomo')" 
+                     class="photo-card glass-card group relative aspect-square rounded-xl overflow-hidden cursor-pointer" 
+                     data-tags="slomo video slow motion ocean waves surf water carmel" 
+                     data-category="videos" 
+                     data-favorite="false">
+                  <div class="absolute inset-0 bg-gradient-to-tr from-cyan-600/70 via-teal-700/60 to-blue-800/60 group-hover:scale-105 transition-transform duration-300"></div>
+                  
+                  <div class="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold shadow-xs border flex items-center gap-1 backdrop-blur-md" style="background: rgba(255, 255, 255, 0.92); color: #0d9488; border-color: rgba(13, 148, 136, 0.3);">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Snail/3D/snail_3d.png" class="w-3 h-3 object-contain" alt="Slo-mo">
+                      <span>Slo-mo 240fps</span>
+                    </span>
+                  </div>
+
+                  <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white text-[10px] font-mono drop-shadow-md">
+                    <span class="truncate">Pacific Breakers</span>
+                    <span>240 fps</span>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ====================================================================
+             VIEW 2: EXPLORER & TRIAGE MODE (RAPID CULLING WORKFLOW)
+             ==================================================================== -->
+        <div id="viewExplorer" class="flex-1 flex flex-col overflow-hidden hidden">
+          
+          <!-- Triage Control Bar -->
+          <div id="triageBar" class="px-4 py-2 border-b flex items-center justify-between select-none shrink-0" style="background: var(--header-bg); border-color: var(--sub-bar-border);">
+            <div class="flex items-center gap-3">
+              <span class="text-xs font-bold" style="color: var(--text-main);">Rapid Triage Engine</span>
+              <span class="text-[11px] font-mono text-purple-600 font-semibold">Active Cluster: #D-104 (2 near copies)</span>
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded border" style="background: var(--badge-neutral-bg); border-color: var(--badge-neutral-border); color: var(--text-secondary);">dhash distance: 2 bits</span>
+            </div>
+
+            <!-- Keyboard Hotkey Shortcuts -->
+            <div class="flex items-center gap-1.5 text-xs font-mono">
+              <button onclick="applyTriage('keep')" class="px-2.5 py-1 rounded-md text-emerald-700 font-semibold border flex items-center gap-1 hover:brightness-105 transition-all cursor-pointer" style="background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3);">
+                <span>Keep</span>
+                <kbd class="px-1 py-0.2 rounded bg-emerald-600 text-white text-[9px]">K</kbd>
+              </button>
+              <button onclick="applyTriage('trash')" class="px-2.5 py-1 rounded-md text-rose-700 font-semibold border flex items-center gap-1 hover:brightness-105 transition-all cursor-pointer" style="background: rgba(225, 29, 72, 0.1); border-color: rgba(225, 29, 72, 0.3);">
+                <span>Trash</span>
+                <kbd class="px-1 py-0.2 rounded bg-rose-600 text-white text-[9px]">N</kbd>
+              </button>
+              <button onclick="applyTriage('skip')" class="px-2.5 py-1 rounded-md border flex items-center gap-1 transition-all cursor-pointer" style="background: var(--btn-ghost-bg); border-color: var(--btn-ghost-border); color: var(--text-secondary);">
+                <span>Skip</span>
+                <kbd class="px-1 py-0.2 rounded border text-[9px]" style="background: var(--badge-neutral-bg);">S</kbd>
+              </button>
+            </div>
+          </div>
+
+          <!-- Side-by-Side Comparison Container -->
+          <div class="flex-1 p-4 grid grid-cols-2 gap-4 overflow-y-auto custom-scroll">
+            
+            <!-- Left Candidate: Primary (High Quality DNG) -->
+            <div class="rounded-xl border flex flex-col overflow-hidden shadow-sm" style="background: var(--card-bg); border-color: #10b981;">
+              <div class="p-2.5 border-b flex items-center justify-between" style="background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.2);">
+                <span class="text-xs font-bold text-emerald-700 flex items-center gap-1.5">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Star/3D/star_3d.png" class="w-4 h-4 object-contain" alt="Keep">
+                  <span>Candidate A · Primary Sharpest (Recommended Keep)</span>
+                </span>
+                <span class="text-[11px] font-mono text-emerald-700 font-bold">9.6 / 10 Score</span>
+              </div>
+
+              <div class="relative flex-1 aspect-video bg-gradient-to-tr from-amber-600 via-orange-500 to-indigo-700 flex items-center justify-center m-3 rounded-lg overflow-hidden">
+                <span class="text-xs text-white/90 font-mono drop-shadow">IMG_4920.DNG · 14-bit Uncompressed RAW</span>
+              </div>
+
+              <div class="p-3 border-t text-xs font-mono space-y-1.5" style="border-color: var(--table-divider); background: var(--table-header-bg);">
+                <div class="flex justify-between">
+                  <span style="color: var(--text-muted);">Resolution:</span>
+                  <span class="font-bold" style="color: var(--text-main);">7008 × 4672 (33.0 MP)</span>
+                </div>
+                <div class="flex justify-between">
+                  <span style="color: var(--text-muted);">File Size:</span>
+                  <span class="font-bold" style="color: var(--text-main);">58.4 MB (Lossless)</span>
+                </div>
+                <div class="flex justify-between">
+                  <span style="color: var(--text-muted);">Camera:</span>
+                  <span style="color: var(--text-main);">Sony α7 IV · FE 35mm F1.4 GM</span>
+                </div>
+                <div class="flex justify-between">
+                  <span style="color: var(--text-muted);">Aesthetic Model:</span>
+                  <span class="text-emerald-600 font-bold">Gold Tier (High Dynamic Range)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Candidate: Blur Duplicate (Candidate for Trash) -->
+            <div class="rounded-xl border flex flex-col overflow-hidden shadow-sm" style="background: var(--card-bg); border-color: rgba(225, 29, 72, 0.4);">
+              <div class="p-2.5 border-b flex items-center justify-between" style="background: rgba(225, 29, 72, 0.08); border-color: rgba(225, 29, 72, 0.2);">
+                <span class="text-xs font-bold text-rose-700 flex items-center gap-1.5">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Wastebasket/3D/wastebasket_3d.png" class="w-4 h-4 object-contain" alt="Trash">
+                  <span>Candidate B · Hand Shake Blur (Candidate for Trash)</span>
+                </span>
+                <span class="text-[11px] font-mono text-rose-600 font-bold">4.2 / 10 Score</span>
+              </div>
+
+              <div class="relative flex-1 aspect-video bg-gradient-to-tr from-amber-700/80 via-orange-600/70 to-indigo-900/80 blur-xs flex items-center justify-center m-3 rounded-lg overflow-hidden">
+                <span class="text-xs text-white/90 font-mono drop-shadow">IMG_4920_copy.JPG · Micro-jitter blur</span>
+              </div>
+
+              <div class="p-3 border-t text-xs font-mono space-y-1.5" style="border-color: var(--table-divider); background: var(--table-header-bg);">
+                <div class="flex justify-between">
+                  <span style="color: var(--text-muted);">Resolution:</span>
+                  <span style="color: var(--text-main);">4032 × 2688 (10.8 MP)</span>
+                </div>
+                <div class="flex justify-between">
+                  <span style="color: var(--text-muted);">File Size:</span>
+                  <span style="color: var(--text-main);">3.8 MB (Compressed)</span>
+                </div>
+                <div class="flex justify-between">
+                  <span style="color: var(--text-muted);">Similarity Distance:</span>
+                  <span class="text-purple-600 font-bold">dhash Hamming = 2</span>
+                </div>
+                <div class="flex justify-between">
+                  <span style="color: var(--text-muted);">Action:</span>
+                  <button onclick="trashDuplicates()" class="text-rose-600 hover:underline font-bold">Queue for Trash</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ====================================================================
+             VIEW 3: PLACES & GEOGRAPHY MAP LOCATION VIEW (USER REQUESTED FEATURE)
+             "where user can see the details of all photos"
+             ==================================================================== -->
+        <div id="viewMap" class="flex-1 flex flex-col overflow-hidden hidden">
+          
+          <!-- Geography Controls & City Filter Header -->
+          <div class="px-4 py-2 border-b flex flex-wrap items-center justify-between gap-2 shrink-0 select-none" style="background: var(--header-bg); border-color: var(--sub-bar-border);">
+            
+            <!-- Map Location Status & Stats -->
+            <div class="flex items-center gap-2">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/World%20map/3D/world_map_3d.png" class="w-5 h-5 object-contain" alt="Geography Map">
+              <div>
+                <span class="text-xs font-bold" style="color: var(--text-main);">Geography & Places Explorer</span>
+                <span class="text-[10px] font-mono ml-2" style="color: var(--text-muted);">1,824 Geocoded Photos across 14 Cities</span>
+              </div>
+            </div>
+
+            <!-- Map Style & Filtering -->
+            <div class="flex items-center gap-1.5 text-xs font-mono">
+              <span class="text-[10px] text-muted mr-1">Locations:</span>
+              <button onclick="selectCityFilter('all')" id="btnCityAll" class="px-2 py-0.5 rounded-full border text-[11px] font-semibold transition-all cursor-pointer active-pill" style="background: var(--pill-active-bg); color: var(--pill-active-text);">All (1,824)</button>
+              <button onclick="selectCityFilter('Tokyo, Japan')" id="btnCityTokyo" class="px-2 py-0.5 rounded-full border text-[11px] transition-all cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">Tokyo (420)</button>
+              <button onclick="selectCityFilter('San Francisco, CA')" id="btnCitySF" class="px-2 py-0.5 rounded-full border text-[11px] transition-all cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">San Francisco (652)</button>
+              <button onclick="selectCityFilter('Dolomites, Italy')" id="btnCityDolomites" class="px-2 py-0.5 rounded-full border text-[11px] transition-all cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">Dolomites (185)</button>
+              <button onclick="selectCityFilter('Yosemite, CA')" id="btnCityYosemite" class="px-2 py-0.5 rounded-full border text-[11px] transition-all cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">Yosemite (312)</button>
+              <button onclick="selectCityFilter('Kyoto, Japan')" id="btnCityKyoto" class="px-2 py-0.5 rounded-full border text-[11px] transition-all cursor-pointer" style="background: var(--pill-bg); border-color: var(--pill-border);">Kyoto (160)</button>
+            </div>
+          </div>
+
+          <!-- Split Map & Comprehensive Details Container -->
+          <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
+            
+            <!-- Left: Interactive World/Regional Vector Map Canvas -->
+            <div class="flex-1 relative map-canvas overflow-hidden flex flex-col justify-between p-4 min-h-[320px]">
+              
+              <!-- Map Top Overlay: Coordinates Search & Zoom -->
+              <div class="flex items-center justify-between z-10">
+                <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl shadow-md border backdrop-blur-md" style="background: var(--window-bg); border-color: var(--window-border);">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Compass/3D/compass_3d.png" class="w-4 h-4 object-contain" alt="GPS">
+                  <span id="mapStatusText" class="text-xs font-mono font-medium" style="color: var(--text-main);">Viewing Worldwide Geocache (14 Cities)</span>
+                </div>
+
+                <!-- Zoom Controls -->
+                <div class="flex items-center gap-1 p-1 rounded-xl shadow-md border backdrop-blur-md" style="background: var(--window-bg); border-color: var(--window-border);">
+                  <button onclick="zoomMap(1)" class="w-7 h-7 flex items-center justify-center font-bold text-xs rounded-lg hover:bg-black/5 cursor-pointer">+</button>
+                  <button onclick="zoomMap(-1)" class="w-7 h-7 flex items-center justify-center font-bold text-xs rounded-lg hover:bg-black/5 cursor-pointer">-</button>
+                </div>
+              </div>
+
+              <!-- Interactive Pins Placed Across Map Canvas -->
+              <div id="mapPinsContainer" class="absolute inset-0 z-0 pointer-events-auto">
+                
+                <!-- PIN 1: Tokyo, Japan (35.6764° N, 139.6500° E) -->
+                <div onclick="selectPinLocation('Tokyo, Japan', '35.6764° N, 139.6500° E', '420 photos', 'IMG_4920.DNG')" class="absolute top-[38%] left-[76%] transform -translate-x-1/2 -translate-y-1/2 cursor-pointer group">
+                  <div class="relative flex flex-col items-center">
+                    <div class="w-10 h-10 rounded-full bg-rose-500/20 pin-pulse absolute"></div>
+                    <div class="w-8 h-8 rounded-full shadow-lg border-2 border-white flex items-center justify-center transition-transform group-hover:scale-125" style="background: #e11d48;">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Round%20pushpin/3D/round_pushpin_3d.png" class="w-4 h-4 object-contain" alt="Pin">
+                    </div>
+                    <div class="mt-1 px-2 py-0.5 rounded-md shadow-md text-[10px] font-bold font-mono tracking-tight text-white bg-black/80 backdrop-blur-md flex items-center gap-1">
+                      <span>Tokyo</span>
+                      <span class="text-rose-400 font-bold">420</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- PIN 2: San Francisco, CA (37.7749° N, 122.4194° W) -->
+                <div onclick="selectPinLocation('San Francisco, CA', '37.7749° N, 122.4194° W', '652 photos', 'IMG_2048.HEIC')" class="absolute top-[42%] left-[22%] transform -translate-x-1/2 -translate-y-1/2 cursor-pointer group">
+                  <div class="relative flex flex-col items-center">
+                    <div class="w-10 h-10 rounded-full bg-blue-500/20 pin-pulse absolute"></div>
+                    <div class="w-8 h-8 rounded-full shadow-lg border-2 border-white flex items-center justify-center transition-transform group-hover:scale-125" style="background: #2563eb;">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Round%20pushpin/3D/round_pushpin_3d.png" class="w-4 h-4 object-contain" alt="Pin">
+                    </div>
+                    <div class="mt-1 px-2 py-0.5 rounded-md shadow-md text-[10px] font-bold font-mono tracking-tight text-white bg-black/80 backdrop-blur-md flex items-center gap-1">
+                      <span>San Francisco</span>
+                      <span class="text-blue-400 font-bold">652</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- PIN 3: Yosemite National Park, CA (37.7456° N, 119.5936° W) -->
+                <div onclick="selectPinLocation('Yosemite, CA', '37.7456° N, 119.5936° W', '312 photos', 'IMG_6820.DNG')" class="absolute top-[44%] left-[25%] transform -translate-x-1/2 -translate-y-1/2 cursor-pointer group">
+                  <div class="relative flex flex-col items-center">
+                    <div class="w-8 h-8 rounded-full shadow-lg border-2 border-white flex items-center justify-center transition-transform group-hover:scale-125" style="background: #d97706;">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Round%20pushpin/3D/round_pushpin_3d.png" class="w-4 h-4 object-contain" alt="Pin">
+                    </div>
+                    <div class="mt-1 px-2 py-0.5 rounded-md shadow-md text-[10px] font-bold font-mono tracking-tight text-white bg-black/80 backdrop-blur-md flex items-center gap-1">
+                      <span>Yosemite</span>
+                      <span class="text-amber-400 font-bold">312</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- PIN 4: Dolomites, Italy (46.5405° N, 12.1357° E) -->
+                <div onclick="selectPinLocation('Dolomites, Italy', '46.5405° N, 12.1357° E', '185 photos', 'IMG_7102.DNG')" class="absolute top-[32%] left-[51%] transform -translate-x-1/2 -translate-y-1/2 cursor-pointer group">
+                  <div class="relative flex flex-col items-center">
+                    <div class="w-8 h-8 rounded-full shadow-lg border-2 border-white flex items-center justify-center transition-transform group-hover:scale-125" style="background: #059669;">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Round%20pushpin/3D/round_pushpin_3d.png" class="w-4 h-4 object-contain" alt="Pin">
+                    </div>
+                    <div class="mt-1 px-2 py-0.5 rounded-md shadow-md text-[10px] font-bold font-mono tracking-tight text-white bg-black/80 backdrop-blur-md flex items-center gap-1">
+                      <span>Dolomites</span>
+                      <span class="text-emerald-400 font-bold">185</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- PIN 5: Kyoto, Japan (35.0116° N, 135.7681° E) -->
+                <div onclick="selectPinLocation('Kyoto, Japan', '35.0116° N, 135.7681° E', '160 photos', 'IMG_5190.HEIC')" class="absolute top-[41%] left-[74%] transform -translate-x-1/2 -translate-y-1/2 cursor-pointer group">
+                  <div class="relative flex flex-col items-center">
+                    <div class="w-8 h-8 rounded-full shadow-lg border-2 border-white flex items-center justify-center transition-transform group-hover:scale-125" style="background: #7c3aed;">
+                      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Round%20pushpin/3D/round_pushpin_3d.png" class="w-4 h-4 object-contain" alt="Pin">
+                    </div>
+                    <div class="mt-1 px-2 py-0.5 rounded-md shadow-md text-[10px] font-bold font-mono tracking-tight text-white bg-black/80 backdrop-blur-md flex items-center gap-1">
+                      <span>Kyoto</span>
+                      <span class="text-purple-400 font-bold">160</span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Map Bottom Footer Overlay -->
+              <div class="flex items-center justify-between z-10 text-[10px] font-mono px-3 py-1.5 rounded-xl border backdrop-blur-md" style="background: var(--window-bg); border-color: var(--window-border); color: var(--text-secondary);">
+                <span>Projection: WGS 84 · EPSG:4326 · Apple Neural Engine Reverse Geocoded</span>
+                <span class="text-emerald-600 font-bold">Zero Cloud Leakage Guarantee</span>
+              </div>
+            </div>
+
+            <!-- Right: COMPREHENSIVE PHOTO DETAILS & GEOGRAPHY INSPECTOR (USER REQUESTED) -->
+            <div class="w-full lg:w-96 p-4 flex flex-col justify-between overflow-y-auto custom-scroll border-t lg:border-t-0 lg:border-l shrink-0" style="background: var(--sidebar-bg); border-color: var(--sidebar-border);">
+              <div class="space-y-4">
+                
+                <!-- Inspector Header -->
+                <div class="flex items-center justify-between pb-2 border-b" style="border-color: var(--table-divider);">
+                  <div class="flex items-center gap-2">
+                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Information/3D/information_3d.png" class="w-4 h-4 object-contain" alt="Details">
+                    <span class="text-xs font-bold" style="color: var(--text-main);">Photo Details & Geography</span>
+                  </div>
+                  <span class="text-[10px] font-mono px-1.5 py-0.5 rounded border" style="background: var(--badge-neutral-bg); border-color: var(--badge-neutral-border);">EXIF v2.32</span>
+                </div>
+
+                <!-- Active Photo Thumbnail & Title -->
+                <div class="p-3 rounded-xl border shadow-xs" style="background: var(--card-bg); border-color: var(--card-border);">
+                  <div class="flex items-center gap-3">
+                    <div id="mapInspectorThumb" class="w-14 h-14 rounded-lg bg-gradient-to-tr from-amber-600 to-indigo-600 shrink-0 flex items-center justify-center text-[10px] font-mono text-white font-bold shadow-xs">
+                      RAW
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <p id="mapInspectorTitle" class="text-xs font-bold truncate" style="color: var(--text-main);">IMG_4920.DNG</p>
+                      <p id="mapInspectorLocation" class="text-[11px] font-mono text-rose-500 font-semibold truncate">Shibuya, Tokyo, Japan</p>
+                      <p id="mapInspectorDate" class="text-[10px] font-mono" style="color: var(--text-muted);">Oct 24, 2026 at 5:42 PM JST</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Section A: Geographic Coordinates & Reverse Geocoding -->
+                <div class="space-y-2">
+                  <p class="text-[10px] font-semibold uppercase tracking-wider font-mono flex items-center gap-1.5" style="color: var(--text-muted);">
+                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Round%20pushpin/3D/round_pushpin_3d.png" class="w-3.5 h-3.5 object-contain" alt="GPS">
+                    <span>Geographic Telemetry</span>
+                  </p>
+                  
+                  <div class="p-2.5 rounded-lg border text-xs font-mono space-y-1.5" style="background: var(--card-bg); border-color: var(--card-border);">
+                    <div class="flex justify-between">
+                      <span style="color: var(--text-muted);">Coordinates:</span>
+                      <span id="mapInspectorGps" class="font-bold" style="color: var(--text-main);">35.6764° N, 139.6500° E</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span style="color: var(--text-muted);">Altitude:</span>
+                      <span id="mapInspectorAlt" style="color: var(--text-main);">42.5m MSL</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span style="color: var(--text-muted);">Heading / Bearing:</span>
+                      <span id="mapInspectorHeading" style="color: var(--text-main);">214° SW (True North)</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span style="color: var(--text-muted);">Map Cluster:</span>
+                      <span id="mapInspectorCluster" class="text-rose-500 font-bold">Tokyo Metro (#1420)</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Section B: Camera & Optical EXIF -->
+                <div class="space-y-2">
+                  <p class="text-[10px] font-semibold uppercase tracking-wider font-mono flex items-center gap-1.5" style="color: var(--text-muted);">
+                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Camera/3D/camera_3d.png" class="w-3.5 h-3.5 object-contain" alt="Camera">
+                    <span>Camera & Optics</span>
+                  </p>
+                  
+                  <div class="p-2.5 rounded-lg border text-xs font-mono space-y-1.5" style="background: var(--card-bg); border-color: var(--card-border);">
+                    <div class="flex justify-between">
+                      <span style="color: var(--text-muted);">Camera:</span>
+                      <span id="mapInspectorCamera" class="font-bold" style="color: var(--text-main);">Sony α7 IV (ILCE-7M4)</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span style="color: var(--text-muted);">Lens Model:</span>
+                      <span id="mapInspectorLens" style="color: var(--text-main);">FE 24-70mm F2.8 GM II</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span style="color: var(--text-muted);">Focal Length:</span>
+                      <span id="mapInspectorFocal" style="color: var(--text-main);">35.0 mm (Full Frame)</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span style="color: var(--text-muted);">Exposure:</span>
+                      <span id="mapInspectorExposure" class="font-bold text-amber-600">ƒ/2.8 · 1/1000s · ISO 100</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span style="color: var(--text-muted);">Color Profile:</span>
+                      <span style="color: var(--text-main);">Display P3 (Wide Gamut)</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Section C: Neural Engine (ANE) & Privacy Vector -->
+                <div class="space-y-2">
+                  <p class="text-[10px] font-semibold uppercase tracking-wider font-mono flex items-center gap-1.5" style="color: var(--text-muted);">
+                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Sparkles/3D/sparkles_3d.png" class="w-3.5 h-3.5 object-contain" alt="Neural">
+                    <span>Neural Gallery On-Device AI</span>
+                  </p>
+                  
+                  <div class="p-2.5 rounded-lg border text-xs font-mono space-y-1.5" style="background: var(--card-bg); border-color: var(--card-border);">
+                    <div class="flex justify-between">
+                      <span style="color: var(--text-muted);">MobileCLIP Latency:</span>
+                      <span class="text-emerald-600 font-bold">2.1 ms (M3 Max Neural Engine)</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span style="color: var(--text-muted);">Aesthetic Quality:</span>
+                      <span class="text-amber-500 font-bold">9.6 / 10 (Gold Tier)</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span style="color: var(--text-muted);">Identified Entities:</span>
+                      <span class="text-purple-600 font-semibold">Eleanor (99.4%) · Neon Street</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span style="color: var(--text-muted);">Local Hash:</span>
+                      <span class="text-[10px] text-gray-500 font-mono truncate max-w-[150px]">7f9b8c2819a...</span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Quick Action Buttons -->
+              <div class="mt-4 pt-3 border-t space-y-2" style="border-color: var(--table-divider);">
+                <button onclick="revealInFinder()" class="w-full py-2 rounded-lg text-xs font-medium border flex items-center justify-center gap-2 transition-all cursor-pointer" style="background: var(--btn-ghost-bg); border-color: var(--btn-ghost-border); color: var(--btn-ghost-text);">
+                  <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/File%20folder/3D/file_folder_3d.png" class="w-3.5 h-3.5 object-contain" alt="Finder">
+                  <span>Reveal in macOS Finder</span>
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+      </main>
+
+      <!-- ======================================================================
+           LIVE INSPECTOR SIDEBAR (FOR TIMELINE & EXPLORER VIEWS)
+           ====================================================================== -->
+      <aside id="timelineInspector" class="w-72 p-4 flex flex-col justify-between overflow-y-auto custom-scroll border-l shrink-0 select-none" style="background: var(--sidebar-bg); border-color: var(--sidebar-border);">
+        <div class="space-y-4">
+          
+          <div class="flex items-center justify-between pb-2 border-b" style="border-color: var(--table-divider);">
+            <div class="flex items-center gap-2">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Information/3D/information_3d.png" class="w-4 h-4 object-contain" alt="Info">
+              <span class="text-xs font-bold" style="color: var(--text-main);">Inspector</span>
+            </div>
+            <button id="btnFavoriteToggle" onclick="toggleFavoriteCurrent()" class="p-1 rounded-md hover:bg-black/5 transition-all cursor-pointer" title="Toggle Favorite">
+              <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Red%20heart/3D/red_heart_3d.png" class="w-4 h-4 object-contain" alt="Favorite">
+            </button>
+          </div>
+
+          <!-- Preview & Name -->
+          <div>
+            <div id="inspectorThumb" class="w-full aspect-video rounded-xl bg-gradient-to-tr from-amber-600 via-orange-500 to-indigo-600 flex items-center justify-center shadow-xs border" style="border-color: var(--card-border);">
+              <span class="text-xs font-mono text-white/90 drop-shadow">DNG Lossless RAW</span>
+            </div>
+            <p id="inspectorName" class="text-xs font-bold mt-2 truncate" style="color: var(--text-main);">IMG_4920.DNG</p>
+            <p class="text-[10px] font-mono" style="color: var(--text-muted);">Saturday, Oct 24, 2026 · 5:42 PM</p>
+          </div>
+
+          <!-- Technical Specs -->
+          <div class="space-y-2">
+            <p class="text-[10px] font-semibold uppercase tracking-wider font-mono" style="color: var(--text-muted);">Camera & EXIF</p>
+            
+            <div class="p-2.5 rounded-lg border text-xs font-mono space-y-1.5" style="background: var(--card-bg); border-color: var(--card-border);">
+              <div class="flex justify-between">
+                <span style="color: var(--text-muted);">Camera:</span>
+                <span id="exifCamera" class="font-bold" style="color: var(--text-main);">Sony α7 IV</span>
+              </div>
+              <div class="flex justify-between">
+                <span style="color: var(--text-muted);">Aperture:</span>
+                <span id="exifAperture" style="color: var(--text-main);">f/2.8</span>
+              </div>
+              <div class="flex justify-between">
+                <span style="color: var(--text-muted);">Shutter:</span>
+                <span id="exifShutter" style="color: var(--text-main);">1/1000s</span>
+              </div>
+              <div class="flex justify-between">
+                <span style="color: var(--text-muted);">ISO:</span>
+                <span id="exifIso" style="color: var(--text-main);">100</span>
+              </div>
+              <div class="flex justify-between">
+                <span style="color: var(--text-muted);">Resolution:</span>
+                <span id="exifResolution" style="color: var(--text-main);">7008 × 4672</span>
+              </div>
+              <div class="flex justify-between">
+                <span style="color: var(--text-muted);">File Size:</span>
+                <span id="exifSize" style="color: var(--text-main);">58.4 MB</span>
+              </div>
+              <div class="flex justify-between">
+                <span style="color: var(--text-muted);">Location:</span>
+                <span id="exifGps" class="text-rose-500 font-bold truncate max-w-[120px]">35.6764° N, 139.6500° E</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Neural Engine Insights -->
+          <div class="space-y-2">
+            <p class="text-[10px] font-semibold uppercase tracking-wider font-mono" style="color: var(--text-muted);">Vision & ANE</p>
+            
+            <div class="p-2.5 rounded-lg border text-xs font-mono space-y-1.5" style="background: var(--card-bg); border-color: var(--card-border);">
+              <div class="flex justify-between">
+                <span style="color: var(--text-muted);">Inference Engine:</span>
+                <span class="text-emerald-600 font-bold">Apple Neural Engine</span>
+              </div>
+              <div class="flex justify-between">
+                <span style="color: var(--text-muted);">Aesthetic Score:</span>
+                <span class="text-amber-500 font-bold">9.6 / 10</span>
+              </div>
+              <div class="flex justify-between">
+                <span style="color: var(--text-muted);">Face Detections:</span>
+                <span class="text-purple-600 font-semibold">Eleanor (99.4%)</span>
+              </div>
+              <div class="flex justify-between">
+                <span style="color: var(--text-muted);">Deduplication:</span>
+                <span class="text-indigo-600 font-semibold">Primary Anchor</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="pt-3 border-t space-y-2" style="border-color: var(--table-divider);">
+          <button onclick="switchView('places')" class="w-full py-2 rounded-lg text-xs font-medium border flex items-center justify-center gap-2 transition-all cursor-pointer" style="background: var(--btn-ghost-bg); border-color: var(--btn-ghost-border); color: var(--btn-ghost-text);">
+            <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/World%20map/3D/world_map_3d.png" class="w-3.5 h-3.5 object-contain" alt="Places">
+            <span>Show on Places Map (⌘3)</span>
+          </button>
+          <button onclick="revealInFinder()" class="w-full py-2 rounded-lg text-xs font-medium border flex items-center justify-center gap-2 transition-all cursor-pointer" style="background: var(--btn-ghost-bg); border-color: var(--btn-ghost-border); color: var(--btn-ghost-text);">
+            <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/File%20folder/3D/file_folder_3d.png" class="w-3.5 h-3.5 object-contain" alt="Finder">
+            <span>Show in Finder</span>
+          </button>
+          <button id="btnTrashCopies" onclick="trashDuplicates()" class="w-full py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer" style="background: rgba(225, 29, 72, 0.1); color: #e11d48; border: 1px solid rgba(225, 29, 72, 0.2);">
+            <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Wastebasket/3D/wastebasket_3d.png" class="w-3.5 h-3.5 object-contain" alt="Trash">
+            <span>Trash Duplicate Copies</span>
+          </button>
+        </div>
+      </aside>
+
+    </div>
+
+    <!-- ========================================================================
+         MACOS DESKTOP STATUS BAR (24PX HEIGHT)
+         ======================================================================== -->
+    <footer class="h-6 border-t px-3 flex items-center justify-between text-[10px] font-mono select-none shrink-0" style="background: var(--header-bg); border-color: var(--header-border); color: var(--text-secondary);">
+      <div class="flex items-center gap-3">
+        <span class="flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          <span id="statusItemCount">1,824 items · 42.8 GB Local Vault</span>
+        </span>
+        <span class="hidden md:inline" style="color: var(--text-muted);">|</span>
+        <span class="hidden md:inline" style="color: var(--text-muted);">ANE CoreML Latency: 2.1ms/img</span>
+        <span class="hidden lg:inline" style="color: var(--text-muted);">|</span>
+        <span class="hidden lg:inline text-indigo-500">36 Duplicate Groups in Utility</span>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <span class="text-blue-500">P2P Wi-Fi Sync Active</span>
+        <span style="color: var(--text-muted);">|</span>
+        <span class="text-emerald-600 font-bold">Zero Cloud Egress</span>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- ========================================================================
+       JAVASCRIPT APPLICATION LOGIC
+       ======================================================================== -->
+  <script>
+    // Theme Management
+    let currentTheme = 'light';
+    let currentView = 'timeline';
+    let currentCategory = 'all';
+    let activeCardElement = null;
+
+    function initTheme() {
+      const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setTheme(isDark ? 'dark' : 'light');
+    }
+
+    function setTheme(theme) {
+      currentTheme = theme;
+      const html = document.documentElement;
+      const themeIcon = document.getElementById('themeIcon');
+      if (theme === 'dark') {
+        html.classList.remove('theme-light');
+        html.classList.add('theme-dark');
+        themeIcon.src = 'https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Sun/3D/sun_3d.png';
+      } else {
+        html.classList.remove('theme-dark');
+        html.classList.add('theme-light');
+        themeIcon.src = 'https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Crescent%20moon/3D/crescent_moon_3d.png';
+      }
+    }
+
+    function toggleTheme() {
+      setTheme(currentTheme === 'light' ? 'dark' : 'light');
+    }
+
+    // Vault Lock / Unlock Simulation
+    function unlockVault() {
+      document.getElementById('unlockScreen').classList.add('hidden');
+    }
+
+    function unlockVaultBiometric() {
+      document.getElementById('unlockScreen').classList.add('hidden');
+    }
+
+    function lockVault() {
+      document.getElementById('unlockScreen').classList.remove('hidden');
+    }
+
+    // Toggle Collapsible Trees (Chevron rotation and show/hide)
+    function toggleCollapse(treeId, chevronId) {
+      const tree = document.getElementById(treeId);
+      const chevron = document.getElementById(chevronId);
+      if (!tree) return;
+      if (tree.classList.contains('collapsed')) {
+        tree.classList.remove('collapsed');
+        if (chevron) chevron.classList.add('rotated');
+      } else {
+        tree.classList.add('collapsed');
+        if (chevron) chevron.classList.remove('rotated');
+      }
+    }
+
+    // View Switching: Timeline (Cmd+1), Explorer (Cmd+2), Places Map (Cmd+3)
+    function switchView(mode) {
+      currentView = mode;
+      const vTimeline = document.getElementById('viewTimeline');
+      const vExplorer = document.getElementById('viewExplorer');
+      const vMap = document.getElementById('viewMap');
+      const bTimeline = document.getElementById('btnTimelineMode');
+      const bExplorer = document.getElementById('btnExplorerMode');
+      const bPlaces = document.getElementById('btnPlacesMode');
+      const tInspector = document.getElementById('timelineInspector');
+
+      // Hide all
+      vTimeline.classList.add('hidden');
+      vExplorer.classList.add('hidden');
+      vMap.classList.add('hidden');
+
+      bTimeline.classList.remove('active');
+      bTimeline.classList.add('inactive');
+      bExplorer.classList.remove('active');
+      bExplorer.classList.add('inactive');
+      bPlaces.classList.remove('active');
+      bPlaces.classList.add('inactive');
+
+      if (mode === 'timeline') {
+        vTimeline.classList.remove('hidden');
+        bTimeline.classList.add('active');
+        bTimeline.classList.remove('inactive');
+        tInspector.classList.remove('hidden');
+      } else if (mode === 'explorer') {
+        vExplorer.classList.remove('hidden');
+        bExplorer.classList.add('active');
+        bExplorer.classList.remove('inactive');
+        tInspector.classList.remove('hidden');
+      } else if (mode === 'places') {
+        vMap.classList.remove('hidden');
+        bPlaces.classList.add('active');
+        bPlaces.classList.remove('inactive');
+        tInspector.classList.add('hidden'); // Places map has its own dedicated rich inspector!
+      }
+    }
+
+    // Category Selection & Dynamic Grid Filtering
+    function selectCategory(category, buttonEl) {
+      currentCategory = category;
+
+      // Update sidebar button highlights
+      document.querySelectorAll('.category-btn').forEach(btn => {
+        btn.classList.remove('active-category');
+      });
+      if (buttonEl) {
+        buttonEl.classList.add('active-category');
+      }
+
+      // Update filter pills highlights
+      document.querySelectorAll('.filter-pill').forEach(pill => {
+        pill.classList.remove('active-pill');
+      });
+
+      // Filter grid cards
+      const cards = document.querySelectorAll('.photo-card');
+      let visibleCount = 0;
+
+      cards.forEach(card => {
+        const itemCat = card.getAttribute('data-category') || '';
+        const itemTags = card.getAttribute('data-tags') || '';
+        const isFav = card.getAttribute('data-favorite') === 'true';
+
+        let matches = false;
+        if (category === 'all') {
+          matches = true;
+        } else if (category === 'favorites') {
+          matches = isFav;
+        } else if (category === 'duplicates') {
+          matches = itemCat === 'duplicates' || itemTags.includes('duplicate');
+        } else if (category === 'videos' || category === 'slomo' || category === 'timelapse' || category === 'screen-recordings') {
+          matches = itemCat === 'videos' || itemTags.includes('video') || itemTags.includes(category);
+        } else if (category === 'pets') {
+          matches = itemCat === 'pets' || itemTags.includes('pet') || itemTags.includes('dog') || itemTags.includes('cat');
+        } else if (category === 'travel') {
+          matches = itemCat === 'travel' || itemTags.includes('travel');
+        } else if (category === 'screenshots') {
+          matches = itemCat === 'screenshots' || itemTags.includes('screenshot');
+        } else if (category === 'documents') {
+          matches = itemCat === 'documents' || itemTags.includes('receipt') || itemTags.includes('document');
+        } else if (category === 'shared-albums' || category === 'shared-with-you' || category === 'partner-sharing') {
+          matches = itemCat === 'shared-albums' || itemTags.includes('shared');
+        } else {
+          matches = itemCat === category || itemTags.includes(category);
+        }
+
+        if (matches) {
+          card.classList.remove('hidden');
+          visibleCount++;
+        } else {
+          card.classList.add('hidden');
+        }
+      });
+
+      document.getElementById('statusItemCount').textContent = `${visibleCount} items visible · Filter: ${category}`;
+    }
+
+    // Person & Pet Face Filter
+    function filterPerson(name) {
+      const cards = document.querySelectorAll('.photo-card');
+      let count = 0;
+      cards.forEach(card => {
+        const tags = (card.getAttribute('data-tags') || '').toLowerCase();
+        if (name === 'all' || tags.includes(name.toLowerCase())) {
+          card.classList.remove('hidden');
+          count++;
+        } else {
+          card.classList.add('hidden');
+        }
+      });
+      document.getElementById('statusItemCount').textContent = `Filtered by Face/Pet: ${name} (${count} photos)`;
+    }
+
+    // Photo Card Selection & Populating Inspectors
+    function selectCard(el, name, res, size, cam, ap, shut, iso, gps, isDuplicate, isFavorite, locationName, categoryTag) {
+      activeCardElement = el;
+      document.querySelectorAll('.photo-card').forEach(c => c.classList.remove('active-card'));
+      el.classList.add('active-card');
+
+      selectPhoto(name, res, size, cam, ap, shut, iso, gps, isDuplicate, isFavorite, locationName);
+
+      const btnTrash = document.getElementById('btnTrashCopies');
+      if (btnTrash) {
+        if (isDuplicate) {
+          btnTrash.classList.remove('hidden');
+        } else {
+          btnTrash.classList.add('hidden');
+        }
+      }
+    }
+
+    function selectPhoto(name, res, size, cam, ap, shut, iso, gps, isDuplicate, isFavorite, locationName) {
+      // Timeline Inspector
+      const elName = document.getElementById('inspectorName');
+      if (elName) elName.textContent = name;
+      const elCam = document.getElementById('exifCamera');
+      if (elCam) elCam.textContent = cam;
+      const elAp = document.getElementById('exifAperture');
+      if (elAp) elAp.textContent = ap;
+      const elShut = document.getElementById('exifShutter');
+      if (elShut) elShut.textContent = shut;
+      const elIso = document.getElementById('exifIso');
+      if (elIso) elIso.textContent = iso;
+      const elRes = document.getElementById('exifResolution');
+      if (elRes) elRes.textContent = res;
+      const elSize = document.getElementById('exifSize');
+      if (elSize) elSize.textContent = size;
+      const elGps = document.getElementById('exifGps');
+      if (elGps) elGps.textContent = gps;
+
+      // Map Inspector Sync
+      const mapTitle = document.getElementById('mapInspectorTitle');
+      if (mapTitle) mapTitle.textContent = name;
+      const mapLoc = document.getElementById('mapInspectorLocation');
+      if (mapLoc) mapLoc.textContent = locationName || 'Geocoded Location';
+      const mapGps = document.getElementById('mapInspectorGps');
+      if (mapGps) mapGps.textContent = gps;
+      const mapCam = document.getElementById('mapInspectorCamera');
+      if (mapCam) mapCam.textContent = cam;
+      const mapExp = document.getElementById('mapInspectorExposure');
+      if (mapExp) mapExp.textContent = `${ap} · ${shut} · ISO ${iso}`;
+
+      const favBtn = document.getElementById('btnFavoriteToggle');
+      if (favBtn) {
+        favBtn.style.opacity = isFavorite ? '1' : '0.6';
+      }
+    }
+
+    // Toggle Favorite on Selected Photo
+    function toggleFavoriteCurrent() {
+      if (!activeCardElement) return;
+      const isFav = activeCardElement.getAttribute('data-favorite') === 'true';
+      const newFav = !isFav;
+      activeCardElement.setAttribute('data-favorite', newFav.toString());
+
+      const favIcon = activeCardElement.querySelector('[alt="Favorited"]');
+      if (newFav) {
+        if (!favIcon) {
+          const div = document.createElement('div');
+          div.className = 'absolute top-2 right-2';
+          div.innerHTML = '<img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Red%20heart/3D/red_heart_3d.png" class="w-4 h-4 object-contain drop-shadow" alt="Favorited">';
+          activeCardElement.appendChild(div);
+        }
+      } else {
+        if (favIcon && favIcon.parentElement) {
+          favIcon.parentElement.remove();
+        }
+      }
+
+      const favBtn = document.getElementById('btnFavoriteToggle');
+      if (favBtn) {
+        favBtn.style.opacity = newFav ? '1' : '0.6';
+      }
+    }
+
+    // Interactive Map Pin Selection
+    function selectPinLocation(cityName, gps, count, photoName) {
+      document.getElementById('mapStatusText').textContent = `Focused on: ${cityName} (${count}) · ${gps}`;
+      document.getElementById('mapInspectorLocation').textContent = cityName;
+      document.getElementById('mapInspectorGps').textContent = gps;
+      document.getElementById('mapInspectorTitle').textContent = photoName;
+      document.getElementById('mapInspectorCluster').textContent = `${cityName} Cluster`;
+    }
+
+    // City Filter in Map Mode
+    function selectCityFilter(city) {
+      document.querySelectorAll('#btnCityAll, #btnCityTokyo, #btnCitySF, #btnCityDolomites, #btnCityYosemite, #btnCityKyoto').forEach(b => {
+        b.classList.remove('active-pill');
+        b.style.background = 'var(--pill-bg)';
+        b.style.color = 'var(--pill-text)';
+      });
+
+      if (city === 'all') {
+        const btn = document.getElementById('btnCityAll');
+        btn.classList.add('active-pill');
+        btn.style.background = 'var(--pill-active-bg)';
+        btn.style.color = 'var(--pill-active-text)';
+        document.getElementById('mapStatusText').textContent = 'Viewing Worldwide Geocache (14 Cities)';
+      } else {
+        document.getElementById('mapStatusText').textContent = `Filtered to ${city}`;
+        document.getElementById('mapInspectorLocation').textContent = city;
+      }
+    }
+
+    function zoomMap(delta) {
+      const status = document.getElementById('mapStatusText');
+      status.textContent = delta > 0 ? 'Map Zoom In: 2.5x Vector Detail' : 'Map Zoom Out: World Overview';
+    }
+
+    // Triage Action Handlers
+    function applyTriage(action) {
+      alert(`Applied Triage: ${action.toUpperCase()} on Cluster #D-104 (dhash distance: 2 bits).`);
+    }
+
+    function trashDuplicates() {
+      if (confirm('Move 36 duplicate blur/low-quality items to Finder Trash Queue? (Local NVMe trash only, recoverable)')) {
+        alert('Moved 36 duplicates to Finder Trash. Reclaimed 1.4 GB.');
+        document.getElementById('cntDuplicates').textContent = '0 groups';
+      }
+    }
+
+    function revealInFinder() {
+      alert('Revealing selected photo in macOS Finder:\n/Volumes/NeuralStorage/2026/10/IMG_4920.DNG');
+    }
+
+    function setTimelineZoom(level) {
+      document.getElementById('statusItemCount').textContent = `Timeline grouping set to: ${level.toUpperCase()}`;
+    }
+
+    // Real-Time MobileCLIP Natural Language Search Filter
+    function filterPhotos() {
+      const q = document.getElementById('searchInput').value.toLowerCase().trim();
+      const cards = document.querySelectorAll('.photo-card');
+      let visible = 0;
+
+      cards.forEach(card => {
+        const tags = (card.getAttribute('data-tags') || '').toLowerCase();
+        const cat = (card.getAttribute('data-category') || '').toLowerCase();
+        if (!q || tags.includes(q) || cat.includes(q)) {
+          card.classList.remove('hidden');
+          visible++;
+        } else {
+          card.classList.add('hidden');
+        }
+      });
+
+      document.getElementById('statusItemCount').textContent = q 
+        ? `MobileCLIP Semantic Query "${q}": ${visible} matching results (ANE 2.1ms)` 
+        : `${visible} items in Local Vault`;
+    }
+
+    // Global Keyboard Shortcuts (macOS HIG)
+    window.addEventListener('keydown', (e) => {
+      if (e.metaKey && e.key === '1') {
+        e.preventDefault();
+        switchView('timeline');
+      } else if (e.metaKey && e.key === '2') {
+        e.preventDefault();
+        switchView('explorer');
+      } else if (e.metaKey && e.key === '3') {
+        e.preventDefault();
+        switchView('places');
+      } else if (e.metaKey && e.key === 'l') {
+        e.preventDefault();
+        lockVault();
+      } else if (e.metaKey && e.key === 'f') {
+        e.preventDefault();
+        document.getElementById('searchInput').focus();
+      } else if (e.key === 'k' || e.key === 'K') {
+        if (currentView === 'explorer') applyTriage('keep');
+      } else if (e.key === 'n' || e.key === 'N') {
+        if (currentView === 'explorer') applyTriage('trash');
+      } else if (e.key === 's' || e.key === 'S') {
+        if (currentView === 'explorer') applyTriage('skip');
+      }
+    });
+
+    // Initialize on load
+    window.addEventListener('DOMContentLoaded', () => {
+      initTheme();
+      // Select first card by default
+      const firstCard = document.querySelector('.photo-card');
+      if (firstCard) {
+        firstCard.click();
+      }
+    });
+  </script>
+</body>
+</html>

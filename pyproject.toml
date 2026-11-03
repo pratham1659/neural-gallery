@@ -1,0 +1,24 @@
+[project]
+name = "neural-gallery"
+version = "0.2.0"
+description = "Encrypted local photo gallery and AI vault for Apple Silicon."
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+dependencies = [
+  "pillow>=10",
+  "imagehash>=4.3",
+  "pywebview>=5",
+  "pyobjc-framework-Cocoa>=10",
+  "pyobjc-framework-Vision>=10",
+  "numpy>=1.26",
+]
+
+[project.scripts]
+neural-gallery = "neural_gallery.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["neural_gallery*"]

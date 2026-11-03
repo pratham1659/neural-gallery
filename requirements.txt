@@ -1,0 +1,18 @@
+bottle==0.13.4
+ImageHash==4.3.2
+numpy==2.4.6
+pillow==13.0.0
+proxy-tools==0.1.0
+pyobjc-core==13.0
+pyobjc-framework-Cocoa==13.0
+pyobjc-framework-CoreML==13.0
+pyobjc-framework-Quartz==13.0
+pyobjc-framework-Security==13.0
+pyobjc-framework-UniformTypeIdentifiers==13.0
+pyobjc-framework-Vision==13.0
+pyobjc-framework-WebKit==13.0
+PyWavelets==1.9.0
+pywebview==6.2.1
+scipy==1.17.1
+typing_extensions==4.16.0
+-e .

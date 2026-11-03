@@ -1,0 +1,29 @@
+# Virtual Environment & Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Rust & Tauri
+target/
+src-tauri/target/
+
+# Node & Frontend
+node_modules/
+.npm/
+
+# Local Databases & Journals
+*.sqlite-wal
+*.sqlite-shm
+.neural-gallery/
+.vault/
+
+# macOS System Files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
