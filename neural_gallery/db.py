@@ -202,7 +202,12 @@ def migrate(connection: sqlite3.Connection) -> None:
         if col_name not in faces_cols:
             connection.execute(f"ALTER TABLE faces ADD COLUMN {col_name} {col_def}")
 
-    # 4. Create indexes after all columns and tables exist
+    # 4. Migrate `shared_albums` table for hidden private folders
+    album_cols = {row[1] for row in connection.execute("PRAGMA table_info(shared_albums)")}
+    if "is_hidden" not in album_cols:
+        connection.execute("ALTER TABLE shared_albums ADD COLUMN is_hidden INTEGER NOT NULL DEFAULT 0")
+
+    # 5. Create indexes after all columns and tables exist
     connection.executescript(INDEXES)
 
 

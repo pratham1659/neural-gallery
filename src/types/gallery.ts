@@ -8,6 +8,21 @@ export interface FolderItem {
   name: string;
   count: number;
   created_at: number;
+  is_hidden?: boolean;
+}
+
+export interface VaultStorageInfo {
+  vault_path: string;
+  managed_ingest: boolean;
+  is_external: boolean;
+  is_ssd: boolean;
+  free_bytes: number;
+  total_bytes: number;
+  free_formatted: string;
+  total_formatted: string;
+  file_count: number;
+  total_size_bytes: number;
+  total_size_formatted: string;
 }
 
 export interface PhotoItem {

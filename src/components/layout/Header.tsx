@@ -11,6 +11,8 @@ import {
   Square,
   ArrowUpDown,
   Menu,
+  Lock,
+  Eye,
 } from "lucide-react";
 import { Info3DIcon } from "../common/Info3DIcon";
 import { ActiveView, CatalogStyle, ThemeMode, TimeScale } from "../../types/gallery";
@@ -43,7 +45,10 @@ interface HeaderProps {
   onFavoriteSelected?: () => void;
   onRemoveFavoriteSelected?: () => void;
   onRestoreSelected?: () => void;
+  onHideSelected?: () => void;
+  onUnhideSelected?: () => void;
   isTrashCategory?: boolean;
+  isHiddenCategory?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -74,7 +79,10 @@ export const Header: React.FC<HeaderProps> = ({
   onFavoriteSelected,
   onRemoveFavoriteSelected,
   onRestoreSelected,
+  onHideSelected,
+  onUnhideSelected,
   isTrashCategory = false,
+  isHiddenCategory = false,
 }) => {
   return (
     <header className="h-14 border-b border-[var(--glass-border)] bg-[var(--glass-panel)] backdrop-blur-xl flex items-center justify-between px-2.5 sm:px-4 z-20 select-none gap-2 min-w-0 w-full overflow-hidden">
@@ -287,6 +295,27 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Trash2 size={11} />
               <span className="hidden sm:inline">Delete</span>
+            </button>
+          ) : null}
+
+          {/* Hide in Vault / Unhide from Vault Action */}
+          {isHiddenCategory && onUnhideSelected ? (
+            <button
+              onClick={onUnhideSelected}
+              className="px-2 py-0.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold flex items-center gap-1 shadow-sm transition-all shrink-0 whitespace-nowrap"
+              title="Unhide selected photos back to main library"
+            >
+              <Eye size={11} />
+              <span>Unhide</span>
+            </button>
+          ) : onHideSelected && !isTrashCategory ? (
+            <button
+              onClick={onHideSelected}
+              className="px-2 py-0.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-semibold flex items-center gap-1 shadow-sm transition-all shrink-0 whitespace-nowrap"
+              title="Hide selected photos in the secure Hidden Vault"
+            >
+              <Lock size={11} />
+              <span className="hidden sm:inline">Hide in Vault</span>
             </button>
           ) : null}
 

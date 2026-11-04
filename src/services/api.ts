@@ -140,10 +140,35 @@ export const api = {
     }
   },
 
-  async createFolder(name: string): Promise<FolderItem> {
+  async createFolder(name: string, is_hidden: boolean = false): Promise<FolderItem> {
     return jsonRequest<FolderItem>("/api/folders", {
       method: "POST",
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, is_hidden }),
+    });
+  },
+
+  async setPhotoHidden(id: number, is_hidden: boolean): Promise<any> {
+    return jsonRequest("/api/hide", {
+      method: "POST",
+      body: JSON.stringify({ id, is_hidden }),
+    });
+  },
+
+  async setPhotosHiddenBulk(ids: number[], is_hidden: boolean): Promise<any> {
+    return Promise.all(ids.map((id) => this.setPhotoHidden(id, is_hidden)));
+  },
+
+  async getVaultStorage(): Promise<import("../types/gallery").VaultStorageInfo> {
+    return jsonRequest<import("../types/gallery").VaultStorageInfo>("/api/vault/storage");
+  },
+
+  async setVaultStorage(
+    vault_path: string,
+    managed_ingest: boolean = true
+  ): Promise<import("../types/gallery").VaultStorageInfo> {
+    return jsonRequest<import("../types/gallery").VaultStorageInfo>("/api/vault/storage", {
+      method: "POST",
+      body: JSON.stringify({ vault_path, managed_ingest }),
     });
   },
 
@@ -389,10 +414,10 @@ export const api = {
     }
   },
 
-  async indexFolder(folder: string): Promise<import("../types/gallery").ScanSummary> {
+  async indexFolder(folder: string, copy_to_vault: boolean = true): Promise<import("../types/gallery").ScanSummary> {
     return jsonRequest<import("../types/gallery").ScanSummary>("/api/scan", {
       method: "POST",
-      body: JSON.stringify({ folder }),
+      body: JSON.stringify({ folder, copy_to_vault }),
     });
   },
 };
