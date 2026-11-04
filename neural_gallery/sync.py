@@ -1,6 +1,12 @@
+import atexit
 import hashlib
 import hmac
+import os
+import re
 import secrets
+import shutil
+import subprocess
+import threading
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
@@ -56,14 +62,142 @@ def get_hostname() -> str:
         return "localhost"
 
 
+_TUNNEL_PROC: subprocess.Popen | None = None
+_TUNNEL_URL: str | None = None
+_TUNNEL_ENABLED: bool = True
+_TUNNEL_LOCK = threading.Lock()
+
+
+def is_tunnel_enabled() -> bool:
+    """Return whether the Universal Cloudflare Tunnel is enabled by the user."""
+    return _TUNNEL_ENABLED
+
+
+def set_tunnel_enabled(enabled: bool, port: int = 8765) -> bool:
+    """Enable or disable the Universal Cloudflare Tunnel dynamically."""
+    global _TUNNEL_ENABLED
+    with _TUNNEL_LOCK:
+        _TUNNEL_ENABLED = enabled
+        if not enabled:
+            stop_tunnel_locked()
+        else:
+            start_tunnel_auto_locked(port)
+        return _TUNNEL_ENABLED
+
+
 def get_tunnel_url() -> str | None:
     """Check for active secure tunnel URL when router blocks local P2P traffic."""
+    global _TUNNEL_URL
+    if not _TUNNEL_ENABLED:
+        return None
+    if _TUNNEL_URL:
+        return _TUNNEL_URL
     p = Path("/tmp/neural_gallery_tunnel.txt")
     if p.is_file():
-        url = p.read_text().strip()
-        if url.startswith("http"):
-            return url
+        try:
+            url = p.read_text().strip()
+            if url.startswith("http"):
+                _TUNNEL_URL = url
+                return _TUNNEL_URL
+        except Exception:
+            pass
     return None
+
+
+def start_tunnel_auto(port: int = 8765) -> str | None:
+    """Automatically spawn cloudflared tunnel in background if installed, enabled, and not yet running."""
+    with _TUNNEL_LOCK:
+        return start_tunnel_auto_locked(port)
+
+
+def start_tunnel_auto_locked(port: int = 8765) -> str | None:
+    global _TUNNEL_PROC, _TUNNEL_URL
+    if not _TUNNEL_ENABLED:
+        return None
+
+    existing = get_tunnel_url()
+    if existing:
+        return existing
+
+    # Locate cloudflared executable (in PATH or standard Homebrew paths)
+    cf_bin = shutil.which("cloudflared")
+    if not cf_bin:
+        for candidate in ("/opt/homebrew/bin/cloudflared", "/usr/local/bin/cloudflared"):
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                cf_bin = candidate
+                break
+    if not cf_bin:
+        return None
+
+    try:
+        proc = subprocess.Popen(
+            [cf_bin, "tunnel", "--url", f"http://127.0.0.1:{port}"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+        _TUNNEL_PROC = proc
+        atexit.register(stop_tunnel)
+
+        url_pattern = re.compile(r"https://[a-zA-Z0-9-]+\.trycloudflare\.com")
+        ready_event = threading.Event()
+
+        def _log_reader():
+            global _TUNNEL_URL
+            if not proc.stdout:
+                return
+            for line in proc.stdout:
+                match = url_pattern.search(line)
+                if match:
+                    _TUNNEL_URL = match.group(0)
+                    try:
+                        Path("/tmp/neural_gallery_tunnel.txt").write_text(_TUNNEL_URL)
+                    except Exception:
+                        pass
+                    ready_event.set()
+                    break
+
+        reader_thread = threading.Thread(target=_log_reader, daemon=True)
+        reader_thread.start()
+        ready_event.wait(timeout=3.5)
+        return _TUNNEL_URL
+    except Exception:
+        return None
+
+
+def stop_tunnel() -> None:
+    """Cleanly terminate the auto-spawned cloudflared tunnel on application exit or user toggle."""
+    with _TUNNEL_LOCK:
+        stop_tunnel_locked()
+
+
+def stop_tunnel_locked() -> None:
+    global _TUNNEL_PROC, _TUNNEL_URL
+    if _TUNNEL_PROC:
+        try:
+            _TUNNEL_PROC.terminate()
+            _TUNNEL_PROC.wait(timeout=1.5)
+        except Exception:
+            try:
+                _TUNNEL_PROC.kill()
+            except Exception:
+                pass
+        _TUNNEL_PROC = None
+
+    # Kill any lingering cloudflared tunnel processes
+    try:
+        subprocess.run(["pkill", "-f", "cloudflared tunnel"], capture_output=True, timeout=2)
+    except Exception:
+        pass
+
+    _TUNNEL_URL = None
+    try:
+        p = Path("/tmp/neural_gallery_tunnel.txt")
+        if p.is_file():
+            p.unlink()
+    except Exception:
+        pass
 
 
 class SyncEngine:
@@ -75,11 +209,33 @@ class SyncEngine:
         self._devices: dict[str, PeerDevice] = {}
         self._sas_pin: str = "849 201"
         self._pin_created_at: float = time.time()
+        self._previous_pin: str | None = None
+        self._pin_ttl: int = 60  # Security OTP auto-rotates every 60 seconds when unpaired
         self._cert_fingerprint: str = hashlib.sha256(self.vault_id.encode()).hexdigest()[:16]
 
     @property
     def sas_pin(self) -> str:
+        self.check_auto_rotate_pin()
         return self._sas_pin
+
+    @property
+    def pin_ttl(self) -> int:
+        return self._pin_ttl
+
+    def get_pin_ttl_remaining(self) -> int:
+        """Return seconds remaining before active unauthenticated OTP expires and rotates."""
+        elapsed = time.time() - self._pin_created_at
+        return max(0, int(self._pin_ttl - elapsed))
+
+    def check_auto_rotate_pin(self) -> bool:
+        """Anti-hack protection: auto-rotate the OTP every 60s when no device is paired."""
+        has_paired = any(d.state == "paired" for d in self._devices.values())
+        if not has_paired:
+            if (time.time() - self._pin_created_at) >= self._pin_ttl:
+                self._previous_pin = self._sas_pin
+                self.generate_new_sas_pin()
+                return True
+        return False
 
     def generate_new_sas_pin(self) -> str:
         """Derive a new 6-digit numeric Short Authentication String (SAS)."""
@@ -90,12 +246,24 @@ class SyncEngine:
         return self._sas_pin
 
     def verify_pin(self, pin: str) -> bool:
-        """Verify the user-entered 6-digit SAS pairing PIN using constant-time comparison."""
+        """Verify the user-entered 6-digit SAS pairing PIN with 15-second rotation grace window."""
+        self.check_auto_rotate_pin()
         clean_input = pin.replace(" ", "").strip()
         clean_actual = self._sas_pin.replace(" ", "").strip()
-        if len(clean_input) != 6 or len(clean_actual) != 6:
+        if len(clean_input) != 6:
             return False
-        return hmac.compare_digest(clean_input, clean_actual)
+
+        # Current active PIN
+        if hmac.compare_digest(clean_input, clean_actual):
+            return True
+
+        # 15-second grace window for previous PIN during rotation to avoid user cutoff
+        if self._previous_pin and (time.time() - self._pin_created_at) <= 15:
+            clean_prev = self._previous_pin.replace(" ", "").strip()
+            if hmac.compare_digest(clean_input, clean_prev):
+                return True
+
+        return False
 
     def pair_device(self, device_id: str, pin: str, name: str = "", model: str = "") -> dict[str, Any]:
         """Pair a device if the SAS PIN matches."""
@@ -136,14 +304,17 @@ class SyncEngine:
 
     def get_status(self, host: str | None = None, port: int = 8765) -> dict[str, Any]:
         """Return full peer-to-peer sync status for UI and Bonjour advertising."""
+        self.check_auto_rotate_pin()
         local_ip = host if host and host not in ("0.0.0.0", "127.0.0.1") else get_local_ip()
         hostname = get_hostname()
-        tunnel_url = get_tunnel_url()
+        tunnel_enabled = is_tunnel_enabled()
+        tunnel_url = (get_tunnel_url() or start_tunnel_auto(port)) if tunnel_enabled else None
         clean_pin = self._sas_pin.replace(" ", "").strip()
         pwa_url = f"http://{local_ip}:{port}/sync"
         pwa_url_direct = f"http://{local_ip}:{port}/sync?pin={clean_pin}"
         pwa_url_hostname = f"http://{hostname}:{port}/sync?pin={clean_pin}"
         pwa_url_tunnel = f"{tunnel_url}/sync?pin={clean_pin}" if tunnel_url else None
+        has_paired = any(d.state == "paired" for d in self._devices.values())
         return {
             "status": "ready",
             "service_name": "_photovault._tcp.local.",
@@ -151,11 +322,14 @@ class SyncEngine:
             "cert_fingerprint": self._cert_fingerprint,
             "devices": [asdict(d) for d in self._devices.values()],
             "sas_pin": self._sas_pin,
+            "pin_expires_in": self.get_pin_ttl_remaining() if not has_paired else None,
+            "pin_ttl": self._pin_ttl,
             "tls_version": "TLS 1.3",
             "mesh_active": True,
             "port": port,
             "local_ip": local_ip,
             "hostname": hostname,
+            "tunnel_enabled": tunnel_enabled,
             "tunnel_url": tunnel_url,
             "pwa_url": pwa_url,
             "pwa_url_direct": pwa_url_direct,

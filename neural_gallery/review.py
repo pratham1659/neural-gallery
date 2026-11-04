@@ -1450,6 +1450,7 @@ def make_handler(db_path: Path):
                 "/api/sync/pair",
                 "/api/sync/unpair",
                 "/api/sync/rotate-pin",
+                "/api/sync/tunnel/toggle",
             }
             if parsed.path not in valid_post_paths:
                 self._send(404, b"", "text/plain")
@@ -1597,9 +1598,26 @@ def make_handler(db_path: Path):
                     self._json(200, {"success": res, "device_id": device_id})
                     return
 
+                if parsed.path == "/api/sync/tunnel/toggle":
+                    enabled = bool(payload.get("enabled", True))
+                    from neural_gallery.sync import set_tunnel_enabled, get_tunnel_url
+                    res_enabled = set_tunnel_enabled(enabled, port=self.server.server_address[1])
+                    t_url = get_tunnel_url() if res_enabled else None
+                    self._json(200, {
+                        "success": True,
+                        "tunnel_enabled": res_enabled,
+                        "tunnel_url": t_url,
+                    })
+                    return
+
                 if parsed.path == "/api/sync/rotate-pin":
-                    new_pin = get_sync_engine().generate_new_sas_pin()
-                    self._json(200, {"success": True, "sas_pin": new_pin})
+                    engine = get_sync_engine()
+                    new_pin = engine.generate_new_sas_pin()
+                    self._json(200, {
+                        "success": True,
+                        "sas_pin": new_pin,
+                        "pin_expires_in": engine.get_pin_ttl_remaining(),
+                    })
                     return
 
                 file_id = payload.get("id")
@@ -1643,6 +1661,12 @@ def _thumbnail(path: Path, edge: int = 1600) -> bytes:
 
 
 def serve(db_path: Path, port: int = 8765) -> None:
+    try:
+        from neural_gallery.sync import start_tunnel_auto, stop_tunnel
+        start_tunnel_auto(port)
+    except Exception:
+        pass
+
     server = ThreadingHTTPServer(("0.0.0.0", port), make_handler(db_path))
     print(f"Neural Gallery review at http://127.0.0.1:{port}", flush=True)
     try:
@@ -1651,5 +1675,10 @@ def serve(db_path: Path, port: int = 8765) -> None:
         pass
     finally:
         server.server_close()
+        try:
+            from neural_gallery.sync import stop_tunnel
+            stop_tunnel()
+        except Exception:
+            pass
 
 

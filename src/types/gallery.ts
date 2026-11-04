@@ -117,16 +117,19 @@ export interface SyncStatus {
   service_name: string;
   vault_id: string;
   sas_pin: string;
+  pin_expires_in?: number | null;
+  pin_ttl?: number;
   tls_version: string;
   mesh_active: boolean;
   port: number;
   local_ip?: string;
   hostname?: string;
-  tunnel_url?: string;
+  tunnel_enabled?: boolean;
+  tunnel_url?: string | null;
   pwa_url: string;
   pwa_url_direct?: string;
   pwa_url_hostname?: string;
-  pwa_url_tunnel?: string;
+  pwa_url_tunnel?: string | null;
   devices: SyncDevice[];
 }
 

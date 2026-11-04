@@ -198,12 +198,15 @@ export const App: React.FC = () => {
   };
 
   const handleRotatePin = async () => {
-    const newPin = await api.rotatePin();
-    setSyncStatus((prev) => ({
-      ...prev,
-      sas_pin: newPin,
-      pwa_url_direct: `http://${prev.local_ip || "127.0.0.1"}:${prev.port || 8765}/sync?pin=${newPin.replace(/\s+/g, "")}`,
-    }));
+    await api.rotatePin();
+    const newStatus = await api.getSyncStatus();
+    setSyncStatus(newStatus);
+  };
+
+  const handleToggleTunnel = async (enabled: boolean) => {
+    await api.toggleTunnel(enabled);
+    const newStatus = await api.getSyncStatus();
+    setSyncStatus(newStatus);
   };
 
   const handleUnpairDevice = async (deviceId: string) => {
@@ -332,6 +335,7 @@ export const App: React.FC = () => {
         onRotatePin={handleRotatePin}
         onPairPin={(pin) => api.pairDevice(pin)}
         onUnpairDevice={handleUnpairDevice}
+        onToggleTunnel={handleToggleTunnel}
       />
 
       <LockScreenModal

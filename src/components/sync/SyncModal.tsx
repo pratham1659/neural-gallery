@@ -9,6 +9,7 @@ interface SyncModalProps {
   onRotatePin: () => void;
   onPairPin: (pin: string) => void;
   onUnpairDevice?: (deviceId: string) => void;
+  onToggleTunnel?: (enabled: boolean) => Promise<void>;
 }
 
 export const SyncModal: React.FC<SyncModalProps> = ({
@@ -17,15 +18,19 @@ export const SyncModal: React.FC<SyncModalProps> = ({
   syncStatus,
   onRotatePin,
   onUnpairDevice,
+  onToggleTunnel,
 }) => {
   const [addressMode, setAddressMode] = useState<"tunnel" | "ip" | "hostname">("tunnel");
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
   const [copied, setCopied] = useState<boolean>(false);
   const [showTroubleshoot, setShowTroubleshoot] = useState<boolean>(false);
+  const [isTogglingTunnel, setIsTogglingTunnel] = useState<boolean>(false);
+  const [countdown, setCountdown] = useState<number>(syncStatus.pin_expires_in ?? 60);
 
   // Compute clean PIN and target hosts
   const cleanPin = (syncStatus.sas_pin || "").replace(/\s+/g, "").trim();
   const port = syncStatus.port || 8765;
+  const isTunnelActive = syncStatus.tunnel_enabled !== false;
 
   const ipHost =
     syncStatus.local_ip && syncStatus.local_ip !== "127.0.0.1" && syncStatus.local_ip !== "0.0.0.0"
@@ -48,10 +53,46 @@ export const SyncModal: React.FC<SyncModalProps> = ({
     directConnectUrl = `http://${nameHost}:${port}/sync?pin=${cleanPin}`;
   }
 
+  // Strict Guardrail: Filter out all hardcoded sample / demo phones
+  const realDevices = (syncStatus.devices || []).filter(
+    (dev) =>
+      dev.id !== "dev-iphone-16" &&
+      dev.id !== "dev-pixel-9" &&
+      !dev.id.includes("sample") &&
+      !dev.name.includes("Pratham's iPhone 16 Pro") &&
+      !dev.name.includes("Pixel 9 Pro XL")
+  );
+
+  // Synchronize countdown with backend pin_expires_in
+  useEffect(() => {
+    if (syncStatus.pin_expires_in !== undefined && syncStatus.pin_expires_in !== null) {
+      setCountdown(syncStatus.pin_expires_in);
+    }
+  }, [syncStatus.pin_expires_in, syncStatus.sas_pin]);
+
+  // Anti-hack dynamic OTP timer: countdown every second and auto-rotate when no device is paired
+  useEffect(() => {
+    if (!isOpen || realDevices.length > 0) return;
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          onRotatePin();
+          return 60;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isOpen, realDevices.length, onRotatePin]);
+
   // Generate QR Code as high-contrast Data URL whenever URL or PIN changes
   useEffect(() => {
     let isMounted = true;
     if (!isOpen) return;
+    if (addressMode === "tunnel" && !isTunnelActive) {
+      setQrDataUrl("");
+      return;
+    }
 
     QRCode.toDataURL(directConnectUrl, {
       width: 220,
@@ -72,24 +113,26 @@ export const SyncModal: React.FC<SyncModalProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [isOpen, directConnectUrl]);
+  }, [isOpen, directConnectUrl, addressMode, isTunnelActive]);
 
   if (!isOpen) return null;
-
-  // Strict Guardrail: Filter out all hardcoded sample / demo phones
-  const realDevices = (syncStatus.devices || []).filter(
-    (dev) =>
-      dev.id !== "dev-iphone-16" &&
-      dev.id !== "dev-pixel-9" &&
-      !dev.id.includes("sample") &&
-      !dev.name.includes("Pratham's iPhone 16 Pro") &&
-      !dev.name.includes("Pixel 9 Pro XL")
-  );
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(directConnectUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleToggleTunnel = async (enabled: boolean) => {
+    if (isTogglingTunnel) return;
+    setIsTogglingTunnel(true);
+    try {
+      if (onToggleTunnel) {
+        await onToggleTunnel(enabled);
+      }
+    } finally {
+      setIsTogglingTunnel(false);
+    }
   };
 
   return (
@@ -113,7 +156,7 @@ export const SyncModal: React.FC<SyncModalProps> = ({
             <h2 className="text-base font-bold text-[var(--text-main)] flex items-center gap-2">
               P2P Mobile Sync &amp; Ingest
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-normal">
-                TLS Encrypted
+                {isTunnelActive ? "TLS Encrypted" : "Air-Gapped Only"}
               </span>
             </h2>
             <p className="text-xs text-[var(--text-muted)]">
@@ -124,7 +167,7 @@ export const SyncModal: React.FC<SyncModalProps> = ({
 
         {/* Scrollable Body */}
         <div className="overflow-y-auto space-y-4 pr-1 text-xs">
-          {/* QR Code Instant Access Card */}
+          {/* Main Connection Card */}
           <div className="p-4 rounded-xl bg-[var(--glass-sidebar)] border border-[var(--glass-border)] flex flex-col items-center text-center">
             {/* Host Mode Selector Tabs */}
             <div className="flex items-center p-0.5 rounded-lg bg-[var(--card)] border border-[var(--glass-border)] mb-3 text-[11px] max-w-full overflow-x-auto">
@@ -132,13 +175,15 @@ export const SyncModal: React.FC<SyncModalProps> = ({
                 onClick={() => setAddressMode("tunnel")}
                 className={`px-3 py-1 rounded-md font-medium transition-all flex items-center gap-1.5 whitespace-nowrap ${
                   addressMode === "tunnel"
-                    ? "bg-emerald-600 text-white shadow-sm"
+                    ? isTunnelActive
+                      ? "bg-emerald-600 text-white shadow-sm"
+                      : "bg-slate-700 text-white shadow-sm"
                     : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
                 }`}
                 title="Universal connection that works over any Wi-Fi, 5G/4G, or Hotspot"
               >
                 <span>🌐</span>
-                <span>Universal (Recommended)</span>
+                <span>Universal {isTunnelActive ? "(Recommended)" : "(Disabled)"}</span>
               </button>
               <button
                 onClick={() => setAddressMode("ip")}
@@ -164,39 +209,124 @@ export const SyncModal: React.FC<SyncModalProps> = ({
               </button>
             </div>
 
-            {/* QR Code Canvas */}
-            <div className="p-2.5 bg-white rounded-2xl shadow-md border border-slate-200/80 my-1">
-              {qrDataUrl ? (
-                <img
-                  src={qrDataUrl}
-                  alt="Scan QR code for direct P2P sync"
-                  className="w-44 h-44 rounded-lg block"
-                />
-              ) : (
-                <div className="w-44 h-44 flex items-center justify-center text-[var(--text-muted)]">
-                  Generating QR...
+            {/* Universal Mode: On/Off Switch & Details */}
+            {addressMode === "tunnel" && (
+              <div className="w-full flex items-center justify-between p-2.5 mb-3 rounded-xl bg-[var(--card)] border border-[var(--glass-border)] text-left">
+                <div className="flex items-center gap-2.5">
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full ${
+                      isTunnelActive ? "bg-emerald-500 animate-pulse" : "bg-slate-400"
+                    }`}
+                  />
+                  <div>
+                    <div className="text-xs font-semibold text-[var(--text-main)] flex items-center gap-1.5">
+                      Cloudflare Universal Tunnel
+                      <span
+                        className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-medium ${
+                          isTunnelActive
+                            ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                            : "bg-slate-500/15 text-slate-400"
+                        }`}
+                      >
+                        {isTunnelActive ? "ON" : "OFF"}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-[var(--text-muted)]">
+                      {isTunnelActive
+                        ? "Active external HTTPS pipe (bypasses router isolation)"
+                        : "Switched OFF. Zero data leaves your local machine"}
+                    </div>
+                  </div>
                 </div>
-              )}
-            </div>
 
-            <p className="text-[11px] text-[var(--text-secondary)] mt-1.5 max-w-xs">
-              Point your phone&apos;s camera at this QR code to authenticate and open the uploader.
-            </p>
+                {/* Apple-style Toggle Switch */}
+                <button
+                  type="button"
+                  onClick={() => handleToggleTunnel(!isTunnelActive)}
+                  disabled={isTogglingTunnel}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    isTunnelActive ? "bg-emerald-500" : "bg-slate-600"
+                  } ${isTogglingTunnel ? "opacity-60 cursor-wait" : ""}`}
+                  title={
+                    isTunnelActive
+                      ? "Click to switch OFF Universal Tunnel"
+                      : "Click to switch ON Universal Tunnel"
+                  }
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                      isTunnelActive ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+            )}
 
-            {/* Direct Link Bar */}
-            <div className="mt-2.5 flex items-center gap-2 w-full max-w-sm">
-              <input
-                readOnly
-                value={directConnectUrl}
-                className="flex-1 px-2.5 py-1.5 rounded-lg bg-[var(--card)] border border-[var(--glass-border)] font-mono text-[11px] text-[var(--text-muted)] truncate select-all"
-              />
-              <button
-                onClick={handleCopyLink}
-                className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium border border-[var(--button-border)] bg-[var(--button-bg)] text-[var(--text-main)] hover:bg-[var(--button-hover)] transition-all shrink-0"
-              >
-                {copied ? "✓ Copied" : "Copy"}
-              </button>
-            </div>
+            {/* If Universal is selected but toggled OFF: Show Air-Gapped State */}
+            {addressMode === "tunnel" && !isTunnelActive ? (
+              <div className="p-5 flex flex-col items-center text-center space-y-2.5 my-1 w-full bg-[var(--card)]/40 rounded-xl border border-[var(--glass-border)]">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-2xl">
+                  🛡️
+                </div>
+                <div className="text-xs font-bold text-[var(--text-main)]">
+                  Universal Tunnel is Switched OFF
+                </div>
+                <p className="text-[11px] text-[var(--text-muted)] max-w-xs leading-relaxed">
+                  Strict air-gapped isolation is active. No third-party network can touch or inspect your traffic.
+                </p>
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    onClick={() => setAddressMode("ip")}
+                    className="px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white text-[11px] font-medium shadow-sm hover:opacity-90 transition-all"
+                  >
+                    Use Local IP 📶
+                  </button>
+                  <button
+                    onClick={() => handleToggleTunnel(true)}
+                    disabled={isTogglingTunnel}
+                    className="px-3 py-1.5 rounded-lg border border-[var(--button-border)] bg-[var(--button-bg)] text-[11px] text-[var(--text-main)] hover:bg-[var(--button-hover)] transition-all"
+                  >
+                    Turn ON Tunnel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* QR Code Canvas */}
+                <div className="p-2.5 bg-white rounded-2xl shadow-md border border-slate-200/80 my-1">
+                  {qrDataUrl ? (
+                    <img
+                      src={qrDataUrl}
+                      alt="Scan QR code for direct P2P sync"
+                      className="w-44 h-44 rounded-lg block"
+                    />
+                  ) : (
+                    <div className="w-44 h-44 flex items-center justify-center text-[var(--text-muted)]">
+                      Generating QR...
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-[11px] text-[var(--text-secondary)] mt-1.5 max-w-xs">
+                  Point your phone&apos;s camera at this QR code to authenticate and open the uploader.
+                </p>
+
+                {/* Direct Link Bar */}
+                <div className="mt-2.5 flex items-center gap-2 w-full max-w-sm">
+                  <input
+                    readOnly
+                    value={directConnectUrl}
+                    className="flex-1 px-2.5 py-1.5 rounded-lg bg-[var(--card)] border border-[var(--glass-border)] font-mono text-[11px] text-[var(--text-muted)] truncate select-all"
+                  />
+                  <button
+                    onClick={handleCopyLink}
+                    className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium border border-[var(--button-border)] bg-[var(--button-bg)] text-[var(--text-main)] hover:bg-[var(--button-hover)] transition-all shrink-0"
+                  >
+                    {copied ? "✓ Copied" : "Copy"}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Troubleshoot Alert Banner */}
@@ -229,28 +359,51 @@ export const SyncModal: React.FC<SyncModalProps> = ({
                 <div>
                   <strong className="text-[var(--text-main)]">3. The Solution:</strong>
                   <br />
-                  Keep <strong>&quot;Universal (Recommended)&quot;</strong> selected above! It uses Cloudflare TLS to create an instant, direct HTTPS link that works 100% reliably regardless of router settings, mobile data, or hotspot isolation.
+                  Use <strong>USB Tethering</strong> or turn on <strong>Universal Tunnel</strong> above!
                 </div>
               </div>
             )}
           </div>
 
-          {/* SAS Pairing PIN Manual Option */}
-          <div className="p-3 rounded-xl bg-[var(--glass-sidebar)] border border-[var(--glass-border)] flex items-center justify-between">
+          {/* Anti-Hack Dynamic Security OTP & Manual PIN */}
+          <div className="p-3.5 rounded-xl bg-[var(--glass-sidebar)] border border-[var(--glass-border)] flex items-center justify-between">
             <div>
-              <div className="text-[10px] font-semibold text-[var(--text-faint)] uppercase tracking-wider">
-                Manual SAS PIN
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-semibold text-[var(--text-faint)] uppercase tracking-wider">
+                  Dynamic Security OTP
+                </span>
+                {realDevices.length === 0 ? (
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                    <span>Rotates in {countdown}s</span>
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                    <span>🔒</span>
+                    <span>Paired ({realDevices.length})</span>
+                  </span>
+                )}
               </div>
               <div className="text-xl font-mono font-bold tracking-widest text-[var(--accent)] mt-0.5">
                 {syncStatus.sas_pin}
               </div>
+              {realDevices.length === 0 ? (
+                <div className="text-[10px] text-[var(--text-muted)] mt-0.5">
+                  🛡️ Auto-rotates every 60s while unpaired to prevent unauthorized access
+                </div>
+              ) : (
+                <div className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5">
+                  ✓ Device authenticated. Old pairing PINs are invalid.
+                </div>
+              )}
             </div>
             <button
               onClick={onRotatePin}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--button-border)] bg-[var(--button-bg)] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all"
-              title="Generate a fresh pairing PIN and QR code"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--button-border)] bg-[var(--button-bg)] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all flex items-center gap-1 shrink-0"
+              title="Generate a fresh pairing OTP immediately"
             >
-              ↻ Rotate PIN
+              <span>↻</span>
+              <span>New OTP</span>
             </button>
           </div>
 

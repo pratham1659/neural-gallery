@@ -240,6 +240,17 @@ export const api = {
     }
   },
 
+  async toggleTunnel(enabled: boolean): Promise<{ success: boolean; tunnel_enabled: boolean; tunnel_url?: string | null }> {
+    try {
+      return await jsonRequest<{ success: boolean; tunnel_enabled: boolean; tunnel_url?: string | null }>("/api/sync/tunnel/toggle", {
+        method: "POST",
+        body: JSON.stringify({ enabled }),
+      });
+    } catch {
+      return { success: false, tunnel_enabled: enabled };
+    }
+  },
+
   async getFolderPresets(): Promise<import("../types/gallery").FolderPreset[]> {
     try {
       return await jsonRequest<import("../types/gallery").FolderPreset[]>("/api/folders/presets");
