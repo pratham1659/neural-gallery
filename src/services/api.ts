@@ -1,5 +1,6 @@
 import {
   CandidateFace,
+  FolderItem,
   LibraryStats,
   MapPin,
   PersonGroup,
@@ -58,14 +59,28 @@ export const api = {
   async getPhotos(category = "all", sort = "date_desc", search = "", limit = 100): Promise<PhotoItem[]> {
     try {
       const params = new URLSearchParams({ category, sort, search, limit: limit.toString() });
-      return await jsonRequest<PhotoItem[]>(`/api/photos?${params.toString()}`);
+      const raw = await jsonRequest<any[]>(`/api/photos?${params.toString()}`);
+      return raw.map((p) => ({
+        ...p,
+        file_name: p.file_name || p.name || "",
+        location_name: p.location_name || p.city || "",
+        thumb: p.thumb || `/media/${p.id}?w=480`,
+      }));
     } catch {
       return [];
     }
   },
 
   async getPhotoDetail(id: number): Promise<PhotoItem> {
-    return jsonRequest<PhotoItem>(`/api/photo?id=${id}`);
+    const raw = await jsonRequest<any>(`/api/photo?id=${id}`);
+    return {
+      ...raw,
+      file_name: raw.file_name || raw.name || "",
+      location_name:
+        raw.location_name ||
+        (raw.city && raw.country ? `${raw.city}, ${raw.country}` : raw.city || raw.country || ""),
+      thumb: raw.thumb || `/media/${raw.id}?w=640`,
+    };
   },
 
   async toggleFavorite(id: number, is_favorite: boolean): Promise<{ id: number; is_favorite: boolean }> {
@@ -87,6 +102,95 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ id, soft }),
     });
+  },
+
+  async trashPhotos(ids: number[], soft = true): Promise<{ ids: number[]; trashed: boolean }> {
+    return jsonRequest<{ ids: number[]; trashed: boolean }>("/api/trash", {
+      method: "POST",
+      body: JSON.stringify({ ids, soft }),
+    });
+  },
+
+  async restorePhotos(ids: number[]): Promise<{ ids: number[]; restored: boolean }> {
+    return jsonRequest<{ ids: number[]; restored: boolean }>("/api/restore", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    });
+  },
+
+  async emptyTrash(): Promise<{ emptied: number; success: boolean }> {
+    return jsonRequest<{ emptied: number; success: boolean }>("/api/trash/empty", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+  },
+
+  async bulkFavorite(ids: number[], is_favorite: boolean): Promise<{ ids: number[]; is_favorite: boolean }> {
+    return jsonRequest<{ ids: number[]; is_favorite: boolean }>("/api/favorites/bulk", {
+      method: "POST",
+      body: JSON.stringify({ ids, is_favorite }),
+    });
+  },
+
+  async getFolders(): Promise<FolderItem[]> {
+    try {
+      return await jsonRequest<FolderItem[]>("/api/folders");
+    } catch {
+      return [];
+    }
+  },
+
+  async createFolder(name: string): Promise<FolderItem> {
+    return jsonRequest<FolderItem>("/api/folders", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    });
+  },
+
+  async deleteFolder(id: number): Promise<{ success: boolean; id: number }> {
+    return jsonRequest<{ success: boolean; id: number }>("/api/folders/delete", {
+      method: "POST",
+      body: JSON.stringify({ id }),
+    });
+  },
+
+  async addPhotosToFolder(folderId: number, fileIds: number[]): Promise<any> {
+    return jsonRequest("/api/folders/add", {
+      method: "POST",
+      body: JSON.stringify({ folder_id: folderId, file_ids: fileIds }),
+    });
+  },
+
+  async removePhotosFromFolder(folderId: number, fileIds: number[]): Promise<any> {
+    return jsonRequest("/api/folders/remove", {
+      method: "POST",
+      body: JSON.stringify({ folder_id: folderId, file_ids: fileIds }),
+    });
+  },
+
+  async setCategory(ids: number[], category: string): Promise<any> {
+    return jsonRequest("/api/category", {
+      method: "POST",
+      body: JSON.stringify({ ids, category }),
+    });
+  },
+
+  async uploadPhoto(file: File): Promise<any> {
+    const arrayBuffer = await file.arrayBuffer();
+    const res = await fetch("/api/sync/upload", {
+      method: "POST",
+      headers: {
+        "Content-Type": file.type || "application/octet-stream",
+        "X-Filename": file.name,
+        "X-Neural-Gallery": "1",
+      },
+      body: arrayBuffer,
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(err || `Upload failed with status ${res.status}`);
+    }
+    return res.json();
   },
 
   async getMapPins(): Promise<MapPin[]> {
