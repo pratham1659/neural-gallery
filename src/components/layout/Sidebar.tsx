@@ -1,20 +1,73 @@
 import React, { useState } from "react";
-import { LibraryStats } from "../../types/gallery";
+import { Folder, FolderPlus, Trash2 } from "lucide-react";
+import { ActiveView, FolderItem, LibraryStats } from "../../types/gallery";
 
 interface SidebarProps {
   currentCategory: string;
   onSelectCategory: (category: string) => void;
+  activeView: ActiveView;
+  onChangeView: (view: ActiveView) => void;
   stats: LibraryStats;
   onOpenSync: () => void;
+  folders?: FolderItem[];
+  onCreateFolder?: (name: string) => Promise<void>;
+  onDeleteFolder?: (folder: FolderItem) => void;
+  onDropOnFolder?: (folderId: number, photoIds: number[]) => Promise<void>;
+  onDropOnCategory?: (category: string, photoIds: number[]) => Promise<void>;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   currentCategory,
   onSelectCategory,
+  activeView,
+  onChangeView,
   stats,
   onOpenSync,
+  folders = [],
+  onCreateFolder,
+  onDeleteFolder,
+  onDropOnFolder,
+  onDropOnCategory,
 }) => {
   const [videosExpanded, setVideosExpanded] = useState(false);
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+
+  const handleCreateFolderSubmit = async () => {
+    if (!newFolderName.trim() || !onCreateFolder) return;
+    try {
+      await onCreateFolder(newFolderName.trim());
+      setNewFolderName("");
+      setIsCreatingFolder(false);
+    } catch (err) {
+      console.error("Failed to create folder:", err);
+    }
+  };
+
+  const handleDropOnItem = async (
+    targetKey: string,
+    e: React.DragEvent,
+    folderId?: number
+  ) => {
+    e.preventDefault();
+    setDropTarget(null);
+    try {
+      const data = e.dataTransfer.getData("application/json");
+      if (!data) return;
+      const parsed = JSON.parse(data);
+      const photoIds = parsed.ids as number[];
+      if (!photoIds || photoIds.length === 0) return;
+
+      if (folderId != null && onDropOnFolder) {
+        await onDropOnFolder(folderId, photoIds);
+      } else if (onDropOnCategory) {
+        await onDropOnCategory(targetKey, photoIds);
+      }
+    } catch (err) {
+      console.warn("Could not handle drop on item:", err);
+    }
+  };
 
   return (
     <aside className="w-64 flex-shrink-0 flex flex-col justify-between border-r border-[var(--glass-border)] bg-[var(--glass-sidebar)] backdrop-blur-xl h-full select-none">
@@ -36,6 +89,157 @@ export const Sidebar: React.FC<SidebarProps> = ({
               Neural Gallery
             </h1>
             <p className="text-[11px] text-[var(--text-muted)]">Encrypted AI Vault</p>
+          </div>
+        </div>
+
+        {/* Section 0: Views Catalog */}
+        <div>
+          <div className="text-[11px] font-semibold text-[var(--text-faint)] uppercase tracking-wider px-2 mb-1.5 flex items-center justify-between">
+            <span>Catalog Views</span>
+          </div>
+          <div className="space-y-0.5">
+            {/* Timeline View */}
+            <button
+              onClick={() => {
+                onSelectCategory("all");
+                onChangeView("timeline");
+              }}
+              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
+                activeView === "timeline" && currentCategory !== "pets"
+                  ? "bg-[var(--accent)] text-white shadow-sm font-semibold"
+                  : "text-[var(--text-main)] hover:bg-[var(--button-hover)]"
+              }`}
+              title="Timeline Gallery Grid"
+            >
+              <div className="flex items-center gap-2.5">
+                <img
+                  src="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Framed%20picture/3D/framed_picture_3d.png"
+                  alt=""
+                  className="w-4 h-4 object-contain"
+                />
+                <span>Timeline</span>
+              </div>
+              <span
+                className={`text-[11px] font-mono ${
+                  activeView === "timeline" && currentCategory !== "pets"
+                    ? "text-white/80"
+                    : "text-[var(--text-muted)]"
+                }`}
+              >
+                {stats.total}
+              </span>
+            </button>
+
+            {/* Explorer View */}
+            <button
+              onClick={() => onChangeView("explorer")}
+              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
+                activeView === "explorer"
+                  ? "bg-[var(--accent)] text-white shadow-sm font-semibold"
+                  : "text-[var(--text-main)] hover:bg-[var(--button-hover)]"
+              }`}
+              title="Explorer & Triage Table"
+            >
+              <div className="flex items-center gap-2.5">
+                <img
+                  src="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Card%20file%20box/3D/card_file_box_3d.png"
+                  alt=""
+                  className="w-4 h-4 object-contain"
+                />
+                <span>Explorer</span>
+              </div>
+              <span
+                className={`text-[11px] font-mono ${
+                  activeView === "explorer" ? "text-white/80" : "text-[var(--text-muted)]"
+                }`}
+              >
+                {stats.total}
+              </span>
+            </button>
+
+            {/* Places View */}
+            <button
+              onClick={() => onChangeView("places")}
+              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
+                activeView === "places"
+                  ? "bg-[var(--accent)] text-white shadow-sm font-semibold"
+                  : "text-[var(--text-main)] hover:bg-[var(--button-hover)]"
+              }`}
+              title="Places & Geography Map"
+            >
+              <div className="flex items-center gap-2.5">
+                <img
+                  src="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/World%20map/3D/world_map_3d.png"
+                  alt=""
+                  className="w-4 h-4 object-contain"
+                />
+                <span>Places</span>
+              </div>
+              <span
+                className={`text-[11px] font-mono ${
+                  activeView === "places" ? "text-white/80" : "text-[var(--text-muted)]"
+                }`}
+              >
+                {stats.geocoded}
+              </span>
+            </button>
+
+            {/* People View */}
+            <button
+              onClick={() => onChangeView("people")}
+              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
+                activeView === "people"
+                  ? "bg-[var(--accent)] text-white shadow-sm font-semibold"
+                  : "text-[var(--text-main)] hover:bg-[var(--button-hover)]"
+              }`}
+              title="People Recognition"
+            >
+              <div className="flex items-center gap-2.5">
+                <img
+                  src="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Busts%20in%20silhouette/3D/busts_in_silhouette_3d.png"
+                  alt=""
+                  className="w-4 h-4 object-contain"
+                />
+                <span>People</span>
+              </div>
+              <span
+                className={`text-[11px] font-mono ${
+                  activeView === "people" ? "text-white/80" : "text-[var(--text-muted)]"
+                }`}
+              >
+                {stats.people}
+              </span>
+            </button>
+
+            {/* Pets View */}
+            <button
+              onClick={() => {
+                onSelectCategory("pets");
+                onChangeView("timeline");
+              }}
+              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
+                currentCategory === "pets"
+                  ? "bg-[var(--accent)] text-white shadow-sm font-semibold"
+                  : "text-[var(--text-main)] hover:bg-[var(--button-hover)]"
+              }`}
+              title="Pets Detection"
+            >
+              <div className="flex items-center gap-2.5">
+                <img
+                  src="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Dog%20face/3D/dog_face_3d.png"
+                  alt=""
+                  className="w-4 h-4 object-contain"
+                />
+                <span>Pets</span>
+              </div>
+              <span
+                className={`text-[11px] font-mono ${
+                  currentCategory === "pets" ? "text-white/80" : "text-[var(--text-muted)]"
+                }`}
+              >
+                {stats.pets}
+              </span>
+            </button>
           </div>
         </div>
 
@@ -110,6 +314,127 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
+        {/* Section 1.5: Separate Folders (Keep photos unmixed) */}
+        <div>
+          <div className="text-[11px] font-semibold text-[var(--text-faint)] uppercase tracking-wider px-2 mb-1.5 flex items-center justify-between">
+            <span>Folders</span>
+            {onCreateFolder && (
+              <button
+                onClick={() => setIsCreatingFolder((prev) => !prev)}
+                className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--button-hover)] transition-all"
+                title="Create Folder (Keep photos unmixed)"
+              >
+                <FolderPlus size={13} />
+              </button>
+            )}
+          </div>
+
+          {/* Inline Folder Creation Form */}
+          {isCreatingFolder && (
+            <div className="p-2 mb-2 rounded-xl bg-[var(--surface-hover)] border border-[var(--glass-border)] shadow-sm space-y-1.5">
+              <input
+                type="text"
+                autoFocus
+                placeholder="Folder name (e.g. Friend's Photos)"
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleCreateFolderSubmit();
+                  if (e.key === "Escape") {
+                    setIsCreatingFolder(false);
+                    setNewFolderName("");
+                  }
+                }}
+                className="w-full px-2 py-1 rounded-md text-xs bg-[var(--button-bg)] border border-[var(--button-border)] text-[var(--text-main)] outline-none focus:border-[var(--accent)]"
+              />
+              <div className="flex items-center justify-end gap-1.5">
+                <button
+                  onClick={() => {
+                    setIsCreatingFolder(false);
+                    setNewFolderName("");
+                  }}
+                  className="px-2 py-0.5 rounded text-[11px] text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateFolderSubmit}
+                  className="px-2.5 py-0.5 rounded text-[11px] font-semibold bg-[var(--accent)] text-white shadow-sm"
+                >
+                  Create
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Folder items list */}
+          <div className="space-y-0.5">
+            {folders.map((folder) => {
+              const isCurrent = currentCategory === `folder:${folder.id}`;
+              const isDropTarget = dropTarget === `folder:${folder.id}`;
+
+              return (
+                <div
+                  key={folder.id}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDropTarget(`folder:${folder.id}`);
+                  }}
+                  onDragLeave={() => setDropTarget(null)}
+                  onDrop={(e) => handleDropOnItem(`folder:${folder.id}`, e, folder.id)}
+                  onClick={() => onSelectCategory(`folder:${folder.id}`)}
+                  className={`group w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all cursor-pointer ${
+                    isDropTarget
+                      ? "ring-2 ring-blue-500 bg-blue-500/20 text-blue-600 dark:text-blue-400 font-semibold"
+                      : isCurrent
+                      ? "bg-[var(--accent)] text-white shadow-sm font-semibold"
+                      : "text-[var(--text-main)] hover:bg-[var(--button-hover)]"
+                  }`}
+                  title={`Folder: ${folder.name} (${folder.count} photos)`}
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <Folder size={14} className={isCurrent ? "text-white" : "text-amber-500"} />
+                    <span className="truncate">{folder.name}</span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0 ml-1">
+                    <span
+                      className={`text-[11px] font-mono ${
+                        isCurrent ? "text-white/80" : "text-[var(--text-muted)]"
+                      }`}
+                    >
+                      {folder.count}
+                    </span>
+                    {onDeleteFolder && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteFolder(folder);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-[var(--text-muted)] hover:text-rose-500 transition-opacity"
+                        title={`Delete folder "${folder.name}"`}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {folders.length === 0 && !isCreatingFolder && (
+              <div
+                onClick={() => setIsCreatingFolder(true)}
+                className="px-2.5 py-1.5 rounded-lg border border-dashed border-[var(--glass-border)] text-[11px] text-[var(--text-muted)] hover:text-[var(--text-main)] hover:border-[var(--accent)] transition-all cursor-pointer flex items-center gap-1.5"
+                title="Create a folder to keep someone's photos separate"
+              >
+                <FolderPlus size={13} />
+                <span>+ New Folder</span>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Section 2: Sharing */}
         <div>
           <div className="text-[11px] font-semibold text-[var(--text-faint)] uppercase tracking-wider px-2 mb-1.5">
@@ -132,7 +457,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 />
                 <span>Shared Albums</span>
               </div>
-              <span className="text-[11px] text-[var(--text-muted)]">3</span>
+              <span className="text-[11px] text-[var(--text-muted)]">
+                {stats.shared_albums ?? folders.length}
+              </span>
             </button>
 
             <button
@@ -151,7 +478,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 />
                 <span>Shared with You</span>
               </div>
-              <span className="text-[11px] text-[var(--text-muted)]">8</span>
+              <span className="text-[11px] text-[var(--text-muted)]">
+                {stats.shared_with_you ?? 0}
+              </span>
             </button>
 
             <button
@@ -170,55 +499,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 />
                 <span>Partner Sharing</span>
               </div>
-              <span className="text-[10px] text-[var(--accent)] font-semibold">Active</span>
+              <span className={`text-[10px] font-semibold ${stats.partner_sharing && stats.partner_sharing > 0 ? "text-[var(--accent)]" : "text-[var(--text-muted)]"}`}>
+                {stats.partner_sharing && stats.partner_sharing > 0 ? "Active" : "Off"}
+              </span>
             </button>
           </div>
         </div>
 
-        {/* Section 3: People, Pets & Travel */}
+        {/* Section 3: Trips & Travel */}
         <div>
           <div className="text-[11px] font-semibold text-[var(--text-faint)] uppercase tracking-wider px-2 mb-1.5">
-            People, Pets & Travel
+            Trips & Travel
           </div>
           <div className="space-y-0.5">
-            <button
-              onClick={() => onSelectCategory("people")}
-              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
-                currentCategory === "people"
-                  ? "bg-[var(--accent)] text-white shadow-sm"
-                  : "text-[var(--text-main)] hover:bg-[var(--button-hover)]"
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <img
-                  src="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Busts%20in%20silhouette/3D/busts_in_silhouette_3d.png"
-                  alt=""
-                  className="w-4 h-4 object-contain"
-                />
-                <span>People</span>
-              </div>
-              <span className="text-[11px] text-[var(--text-muted)]">{stats.people}</span>
-            </button>
-
-            <button
-              onClick={() => onSelectCategory("pets")}
-              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
-                currentCategory === "pets"
-                  ? "bg-[var(--accent)] text-white shadow-sm"
-                  : "text-[var(--text-main)] hover:bg-[var(--button-hover)]"
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <img
-                  src="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Dog%20face/3D/dog_face_3d.png"
-                  alt=""
-                  className="w-4 h-4 object-contain"
-                />
-                <span>Pets</span>
-              </div>
-              <span className="text-[11px] text-[var(--text-muted)]">{stats.pets}</span>
-            </button>
-
             <button
               onClick={() => onSelectCategory("travel")}
               className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
@@ -235,7 +528,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 />
                 <span>Travel</span>
               </div>
-              <span className="text-[11px] text-[var(--text-muted)]">5 trips</span>
+              <span className="text-[11px] text-[var(--text-muted)]">
+                {stats.travel ? `${stats.travel} ${stats.travel === 1 ? "trip" : "trips"}` : "0 trips"}
+              </span>
             </button>
           </div>
         </div>
@@ -295,7 +590,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       />
                       <span>ProRes 4K</span>
                     </div>
-                    <span className="text-[10px] text-[var(--text-muted)]">3</span>
+                    <span className="text-[10px] text-[var(--text-muted)]">{stats.prores ?? 0}</span>
                   </button>
                   <button
                     onClick={() => onSelectCategory("slomo")}
@@ -309,7 +604,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       />
                       <span>Slo-mo 240fps</span>
                     </div>
-                    <span className="text-[10px] text-[var(--text-muted)]">2</span>
+                    <span className="text-[10px] text-[var(--text-muted)]">{stats.slomo ?? 0}</span>
                   </button>
                   <button
                     onClick={() => onSelectCategory("timelapse")}
@@ -323,7 +618,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       />
                       <span>Time-lapse</span>
                     </div>
-                    <span className="text-[10px] text-[var(--text-muted)]">4</span>
+                    <span className="text-[10px] text-[var(--text-muted)]">{stats.timelapse ?? 0}</span>
                   </button>
                   <button
                     onClick={() => onSelectCategory("screen_recordings")}
@@ -337,7 +632,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       />
                       <span>Screen Rec</span>
                     </div>
-                    <span className="text-[10px] text-[var(--text-muted)]">3</span>
+                    <span className="text-[10px] text-[var(--text-muted)]">{stats.screen_recordings ?? 0}</span>
                   </button>
                 </div>
               )}
@@ -435,7 +730,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 />
                 <span>Panoramas</span>
               </div>
-              <span className="text-[11px] text-[var(--text-muted)]">6</span>
+              <span className="text-[11px] text-[var(--text-muted)]">{stats.panoramas ?? 0}</span>
             </button>
 
             <button
@@ -454,7 +749,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 />
                 <span>Receipts & Docs (OCR)</span>
               </div>
-              <span className="text-[11px] text-[var(--text-muted)]">11</span>
+              <span className="text-[11px] text-[var(--text-muted)]">{stats.documents ?? 0}</span>
             </button>
           </div>
         </div>
@@ -540,7 +835,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 />
                 <span>Imports</span>
               </div>
-              <span className="text-[11px] text-[var(--text-muted)]">12</span>
+              <span className="text-[11px] text-[var(--text-muted)]">{stats.imports ?? stats.total}</span>
             </button>
           </div>
         </div>

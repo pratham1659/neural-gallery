@@ -6,7 +6,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from PIL import ExifTags, Image, UnidentifiedImageError
+from PIL import ExifTags, Image, ImageOps, UnidentifiedImageError
 
 from neural_gallery.db import connect
 from neural_gallery.duplicates import rebuild_groups
@@ -175,6 +175,10 @@ def index_file(path: Path) -> dict | None:
     # Handle Image & RAW Files
     try:
         with Image.open(path) as image:
+            # Respect EXIF Orientation tag so width, height and aspect ratio match true visual orientation
+            oriented = ImageOps.exif_transpose(image)
+            if oriented is not None:
+                image = oriented
             width, height = image.size
             digest = _hash_image(image)
             sharpness = _compute_sharpness(image)

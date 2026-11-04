@@ -8,7 +8,7 @@ from io import BytesIO
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from PIL import Image
+from PIL import Image, ImageOps
 
 from neural_gallery.access import allowed_file
 from neural_gallery.actions import (
@@ -873,6 +873,17 @@ def _stats(connection) -> dict:
         ),
         "keep": count("SELECT COUNT(*) FROM files WHERE label = 'keep' AND is_trashed = 0"),
         "noise": count("SELECT COUNT(*) FROM files WHERE label = 'noise' AND is_trashed = 0"),
+        "panoramas": count("SELECT COUNT(*) FROM files WHERE ((width * 1.0 / NULLIF(height, 0)) >= 2.2 OR is_panorama = 1) AND is_trashed = 0"),
+        "documents": count("SELECT COUNT(*) FROM files WHERE (id IN (SELECT file_id FROM asset_ocr) OR category = 'document' OR is_document = 1) AND is_trashed = 0"),
+        "shared_albums": count("SELECT COUNT(*) FROM shared_albums"),
+        "shared_with_you": count("SELECT COUNT(DISTINCT file_id) FROM shared_album_files"),
+        "partner_sharing": count("SELECT COUNT(*) FROM shared_album_files WHERE album_id IN (SELECT id FROM shared_albums WHERE name LIKE '%partner%')"),
+        "travel": count("SELECT COUNT(DISTINCT strftime('%Y-%m', COALESCE(captured_at, datetime(mtime, 'unixepoch')))) FROM files WHERE latitude IS NOT NULL AND is_trashed = 0"),
+        "imports": count("SELECT COUNT(*) FROM files WHERE is_trashed = 0"),
+        "prores": count("SELECT COUNT(*) FROM files WHERE is_video = 1 AND (path LIKE '%prores%' OR mime_type LIKE '%quicktime%') AND is_trashed = 0"),
+        "slomo": count("SELECT COUNT(*) FROM files WHERE is_video = 1 AND (path LIKE '%slomo%' OR path LIKE '%slow%') AND is_trashed = 0"),
+        "timelapse": count("SELECT COUNT(*) FROM files WHERE is_video = 1 AND (path LIKE '%timelapse%' OR path LIKE '%time-lapse%') AND is_trashed = 0"),
+        "screen_recordings": count("SELECT COUNT(*) FROM files WHERE is_video = 1 AND is_screenshot = 1 AND is_trashed = 0"),
     }
 
 
@@ -928,6 +939,11 @@ def query_photos(
         where.append("is_trashed = 1")
     elif cat in ("shared-albums", "shared-with-you", "partner-sharing"):
         where.append("id IN (SELECT file_id FROM shared_album_files) AND is_trashed = 0")
+    elif cat.startswith("folder:"):
+        f_id = cat.split("folder:")[1]
+        if f_id.isdigit():
+            where.append("id IN (SELECT file_id FROM shared_album_files WHERE album_id = ?) AND is_trashed = 0")
+            params.append(int(f_id))
     elif cat in ("pets", "people"):
         if cat == "pets":
             where.append("id IN (SELECT file_id FROM faces JOIN people ON people.person_key = faces.person_key WHERE people.is_pet = 1) AND is_trashed = 0")
@@ -958,6 +974,8 @@ def query_photos(
         order_clause = "ORDER BY size DESC"
     elif sort == "name_asc":
         order_clause = "ORDER BY path ASC"
+    elif sort == "category":
+        order_clause = "ORDER BY category ASC, COALESCE(captured_at, mtime) DESC, id DESC"
 
     limit_val = max(1, min(int(limit), 500))
     offset_val = max(0, int(offset))
@@ -986,10 +1004,12 @@ def query_photos(
             "id": row["id"],
             "path": row["path"],
             "name": Path(row["path"]).name,
+            "file_name": row["file_name"] or Path(row["path"]).name,
+            "original_extension": row["original_extension"] or Path(row["path"]).suffix.lstrip(".").lower(),
             "width": row["width"],
             "height": row["height"],
             "size": row["size"],
-            "created_at": row["captured_at"],
+            "created_at": row["captured_at"] if row["captured_at"] else row["mtime"],
             "mtime": row["mtime"],
             "is_favorite": bool(row["is_favorite"]),
             "is_video": bool(row["is_video"]),
@@ -1006,6 +1026,7 @@ def query_photos(
             "f_number": f"ƒ/{row['aperture_f_number']}" if row["aperture_f_number"] else "",
             "exposure_time": str(row["shutter_speed_seconds"] or ""),
             "iso": str(row["iso_equivalent"] or ""),
+            "color_space": row["color_space"] or "",
             "latitude": row["latitude"],
             "longitude": row["longitude"],
             "altitude": row["altitude_meters"],
@@ -1053,14 +1074,54 @@ def map_pins(connection) -> list[dict]:
     ]
 
 
-def sync_status() -> dict:
-    return get_sync_engine().get_status()
+def sync_status(port: int = 8765) -> dict:
+    return get_sync_engine().get_status(port=port)
+
+
+def choose_folder_dialog(prompt: str = "Select a photo folder to index in Neural Gallery") -> str | None:
+    """Prompt the user with native macOS Finder Open panel via AppleScript."""
+    import subprocess
+    try:
+        script = f'POSIX path of (choose folder with prompt "{prompt}")'
+        res = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=120)
+        if res.returncode == 0:
+            folder = res.stdout.strip().rstrip("/")
+            if folder and Path(folder).is_dir():
+                return folder
+    except Exception:
+        pass
+    return None
+
+
+def folder_presets() -> list[dict]:
+    """Common macOS photo directories for quick one-click indexing."""
+    home = Path.home()
+    presets = [
+        {"name": "Pictures", "path": str(home / "Pictures"), "icon": "📸", "exists": (home / "Pictures").is_dir()},
+        {"name": "Downloads", "path": str(home / "Downloads"), "icon": "📥", "exists": (home / "Downloads").is_dir()},
+        {"name": "Desktop", "path": str(home / "Desktop"), "icon": "🖥️", "exists": (home / "Desktop").is_dir()},
+        {"name": "Documents", "path": str(home / "Documents"), "icon": "📄", "exists": (home / "Documents").is_dir()},
+        {"name": "Home Folder", "path": str(home), "icon": "🏠", "exists": True},
+    ]
+    volumes = Path("/Volumes")
+    if volumes.is_dir():
+        for vol in volumes.iterdir():
+            if vol.is_dir() and vol.name not in ("Macintosh HD", "Macintosh HD - Data"):
+                presets.append({
+                    "name": f"Volume: {vol.name}",
+                    "path": str(vol),
+                    "icon": "💾",
+                    "exists": True
+                })
+    return presets
 
 
 def make_handler(db_path: Path):
     class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
         def log_message(self, fmt: str, *args) -> None:
-            return
+            print(f"[HTTP] {self.client_address[0]}:{self.client_address[1]} - {fmt % args}", flush=True)
 
         def _send(self, status: int, body: bytes, content_type: str) -> None:
             self.send_response(status)
@@ -1068,11 +1129,31 @@ def make_handler(db_path: Path):
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
+            self.send_header("Access-Control-Allow-Headers", "*")
             self.end_headers()
-            self.wfile.write(body)
+            if not getattr(self, "_is_head", False):
+                self.wfile.write(body)
 
         def _json(self, status: int, payload) -> None:
             self._send(status, json.dumps(payload).encode(), "application/json")
+
+        def do_HEAD(self) -> None:
+            self._is_head = True
+            try:
+                self.do_GET()
+            finally:
+                self._is_head = False
+
+        def do_OPTIONS(self) -> None:
+            self.send_response(204)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
+            self.send_header("Access-Control-Allow-Headers", "*")
+            self.send_header("Access-Control-Max-Age", "86400")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
 
         def do_GET(self) -> None:
             parsed = urlparse(self.path)
@@ -1124,6 +1205,9 @@ def make_handler(db_path: Path):
                     self._json(200, _stats(connection))
                 finally:
                     connection.close()
+                return
+            if parsed.path == "/api/folders/presets":
+                self._json(200, folder_presets())
                 return
             if parsed.path == "/api/photos":
                 query = parse_qs(parsed.query)
@@ -1181,7 +1265,26 @@ def make_handler(db_path: Path):
                 self._json(200, candidates)
                 return
             if parsed.path == "/api/sync/status":
-                self._json(200, sync_status())
+                self._json(200, sync_status(port=self.server.server_address[1]))
+                return
+            if parsed.path == "/api/folders":
+                connection = connect(db_path)
+                try:
+                    rows = connection.execute("""
+                        SELECT shared_albums.id, shared_albums.name, shared_albums.created_at,
+                               COUNT(shared_album_files.file_id) AS count
+                        FROM shared_albums
+                        LEFT JOIN shared_album_files ON shared_album_files.album_id = shared_albums.id
+                        GROUP BY shared_albums.id
+                        ORDER BY shared_albums.id ASC
+                    """).fetchall()
+                    folders = [
+                        {"id": r["id"], "name": r["name"], "created_at": r["created_at"], "count": r["count"]}
+                        for r in rows
+                    ]
+                    self._json(200, folders)
+                finally:
+                    connection.close()
                 return
             if parsed.path == "/api/search":
                 query = parse_qs(parsed.query)
@@ -1364,9 +1467,21 @@ def make_handler(db_path: Path):
                 self._json(200, summary)
                 return
 
+            if parsed.path == "/api/folders/choose":
+                folder = choose_folder_dialog()
+                if folder:
+                    self._json(200, {"folder": folder, "success": True})
+                else:
+                    self._json(200, {"folder": None, "canceled": True})
+                return
+
             valid_post_paths = {
                 "/api/label",
                 "/api/trash",
+                "/api/restore",
+                "/api/trash/empty",
+                "/api/trash/bulk",
+                "/api/favorites/bulk",
                 "/api/trash-copies",
                 "/api/move",
                 "/api/reveal",
@@ -1374,11 +1489,16 @@ def make_handler(db_path: Path):
                 "/api/favorite",
                 "/api/hide",
                 "/api/category",
+                "/api/folders",
+                "/api/folders/delete",
+                "/api/folders/add",
+                "/api/folders/remove",
                 "/api/person/confirm",
                 "/api/person/merge",
                 "/api/sync/pair",
                 "/api/sync/unpair",
                 "/api/sync/rotate-pin",
+                "/api/sync/tunnel/toggle",
             }
             if parsed.path not in valid_post_paths:
                 self._send(404, b"", "text/plain")
@@ -1441,28 +1561,144 @@ def make_handler(db_path: Path):
                     return
 
                 if parsed.path == "/api/category":
-                    file_id = payload.get("id")
                     category = payload.get("category")
-                    if not isinstance(file_id, int) or not isinstance(category, str):
-                        self._json(400, {"error": "id and category string are required"})
+                    if not isinstance(category, str):
+                        self._json(400, {"error": "category string is required"})
                         return
-                    set_category(connection, file_id, category)
-                    self._json(200, {"id": file_id, "category": category})
+                    raw_ids = payload.get("ids")
+                    if raw_ids is None and "id" in payload:
+                        raw_ids = [payload.get("id")]
+                    if not isinstance(raw_ids, list) or not raw_ids:
+                        self._json(400, {"error": "valid id or ids list is required"})
+                        return
+                    for fid in raw_ids:
+                        if isinstance(fid, int):
+                            try:
+                                set_category(connection, fid, category)
+                            except Exception:
+                                pass
+                    self._json(200, {"ids": raw_ids, "category": category})
                     return
 
-                if parsed.path == "/api/trash":
-                    file_id = payload.get("id")
-                    if not isinstance(file_id, int):
-                        self._json(400, {"error": "id is required"})
+                if parsed.path == "/api/folders":
+                    name = (payload.get("name") or "").strip()
+                    if not name:
+                        self._json(400, {"error": "folder name is required"})
+                        return
+                    cur = connection.cursor()
+                    cur.execute(
+                        "INSERT INTO shared_albums (name, album_type, created_at) VALUES (?, 'folder', ?)",
+                        (name, time.time()),
+                    )
+                    folder_id = cur.lastrowid
+                    connection.commit()
+                    self._json(200, {"id": folder_id, "name": name, "count": 0})
+                    return
+
+                if parsed.path == "/api/folders/delete":
+                    folder_id = payload.get("id")
+                    if not isinstance(folder_id, int):
+                        self._json(400, {"error": "valid folder id is required"})
+                        return
+                    connection.execute("DELETE FROM shared_album_files WHERE album_id = ?", (folder_id,))
+                    connection.execute("DELETE FROM shared_albums WHERE id = ?", (folder_id,))
+                    connection.commit()
+                    self._json(200, {"success": True, "id": folder_id})
+                    return
+
+                if parsed.path == "/api/folders/add":
+                    folder_id = payload.get("folder_id")
+                    raw_ids = payload.get("file_ids") or payload.get("ids") or []
+                    if isinstance(raw_ids, int):
+                        raw_ids = [raw_ids]
+                    for fid in raw_ids:
+                        if isinstance(fid, int):
+                            connection.execute(
+                                "INSERT OR IGNORE INTO shared_album_files (album_id, file_id) VALUES (?, ?)",
+                                (folder_id, fid),
+                            )
+                    connection.commit()
+                    self._json(200, {"success": True, "folder_id": folder_id, "count": len(raw_ids)})
+                    return
+
+                if parsed.path == "/api/folders/remove":
+                    folder_id = payload.get("folder_id")
+                    raw_ids = payload.get("file_ids") or payload.get("ids") or []
+                    if isinstance(raw_ids, int):
+                        raw_ids = [raw_ids]
+                    for fid in raw_ids:
+                        if isinstance(fid, int):
+                            connection.execute(
+                                "DELETE FROM shared_album_files WHERE album_id = ? AND file_id = ?",
+                                (folder_id, fid),
+                            )
+                    connection.commit()
+                    self._json(200, {"success": True, "folder_id": folder_id, "count": len(raw_ids)})
+                    return
+
+                if parsed.path in ("/api/trash", "/api/restore", "/api/trash/bulk"):
+                    is_restore = parsed.path == "/api/restore" or bool(payload.get("restore")) or payload.get("trashed") is False
+                    raw_ids = payload.get("ids")
+                    if raw_ids is None and "id" in payload:
+                        raw_ids = [payload.get("id")]
+                    if not isinstance(raw_ids, list) or not raw_ids:
+                        self._json(400, {"error": "valid id or ids list is required"})
                         return
                     soft = payload.get("soft", True)
-                    if soft:
-                        trashed = mark_trashed(connection, file_id, True)
-                        self._json(200, {"id": file_id, "trashed": trashed, "soft": True})
-                    else:
-                        path_trashed = trash_indexed(connection, file_id)
-                        connection.commit()
-                        self._json(200, {"id": file_id, "trashed": path_trashed, "soft": False})
+                    processed = []
+                    for fid in raw_ids:
+                        if not isinstance(fid, int):
+                            continue
+                        try:
+                            if is_restore:
+                                mark_trashed(connection, fid, False)
+                                processed.append(fid)
+                            elif soft:
+                                mark_trashed(connection, fid, True)
+                                processed.append(fid)
+                            else:
+                                trash_indexed(connection, fid)
+                                processed.append(fid)
+                        except Exception:
+                            pass
+                    connection.commit()
+                    self._json(200, {
+                        "ids": processed,
+                        "id": processed[0] if len(processed) == 1 else None,
+                        "trashed": not is_restore,
+                        "restored": is_restore,
+                        "soft": soft,
+                        "count": len(processed),
+                    })
+                    return
+
+                if parsed.path == "/api/trash/empty":
+                    trashed_rows = connection.execute("SELECT id FROM files WHERE is_trashed = 1").fetchall()
+                    count = 0
+                    for row in trashed_rows:
+                        fid = row["id"]
+                        try:
+                            trash_indexed(connection, fid)
+                            count += 1
+                        except Exception:
+                            connection.execute("DELETE FROM files WHERE id = ?", (fid,))
+                            count += 1
+                    connection.commit()
+                    self._json(200, {"emptied": count, "success": True})
+                    return
+
+                if parsed.path == "/api/favorites/bulk":
+                    raw_ids = payload.get("ids")
+                    is_fav = bool(payload.get("is_favorite", True))
+                    if not isinstance(raw_ids, list) or not raw_ids:
+                        self._json(400, {"error": "ids list is required"})
+                        return
+                    val = 1 if is_fav else 0
+                    for fid in raw_ids:
+                        if isinstance(fid, int):
+                            connection.execute("UPDATE files SET is_favorite = ? WHERE id = ?", (val, fid))
+                    connection.commit()
+                    self._json(200, {"ids": raw_ids, "is_favorite": is_fav, "count": len(raw_ids)})
                     return
 
                 if parsed.path == "/api/person":
@@ -1526,9 +1762,26 @@ def make_handler(db_path: Path):
                     self._json(200, {"success": res, "device_id": device_id})
                     return
 
+                if parsed.path == "/api/sync/tunnel/toggle":
+                    enabled = bool(payload.get("enabled", True))
+                    from neural_gallery.sync import set_tunnel_enabled, get_tunnel_url
+                    res_enabled = set_tunnel_enabled(enabled, port=self.server.server_address[1])
+                    t_url = get_tunnel_url() if res_enabled else None
+                    self._json(200, {
+                        "success": True,
+                        "tunnel_enabled": res_enabled,
+                        "tunnel_url": t_url,
+                    })
+                    return
+
                 if parsed.path == "/api/sync/rotate-pin":
-                    new_pin = get_sync_engine().generate_new_sas_pin()
-                    self._json(200, {"success": True, "sas_pin": new_pin})
+                    engine = get_sync_engine()
+                    new_pin = engine.generate_new_sas_pin()
+                    self._json(200, {
+                        "success": True,
+                        "sas_pin": new_pin,
+                        "pin_expires_in": engine.get_pin_ttl_remaining(),
+                    })
                     return
 
                 file_id = payload.get("id")
@@ -1564,6 +1817,9 @@ def make_handler(db_path: Path):
 
 def _thumbnail(path: Path, edge: int = 1600) -> bytes:
     with Image.open(path) as image:
+        oriented = ImageOps.exif_transpose(image)
+        if oriented is not None:
+            image = oriented
         image = image.convert("RGB")
         image.thumbnail((edge, edge))
         buffer = BytesIO()
@@ -1572,6 +1828,12 @@ def _thumbnail(path: Path, edge: int = 1600) -> bytes:
 
 
 def serve(db_path: Path, port: int = 8765) -> None:
+    try:
+        from neural_gallery.sync import start_tunnel_auto, stop_tunnel
+        start_tunnel_auto(port)
+    except Exception:
+        pass
+
     server = ThreadingHTTPServer(("0.0.0.0", port), make_handler(db_path))
     print(f"Neural Gallery review at http://127.0.0.1:{port}", flush=True)
     try:
@@ -1580,5 +1842,10 @@ def serve(db_path: Path, port: int = 8765) -> None:
         pass
     finally:
         server.server_close()
+        try:
+            from neural_gallery.sync import stop_tunnel
+            stop_tunnel()
+        except Exception:
+            pass
 
 

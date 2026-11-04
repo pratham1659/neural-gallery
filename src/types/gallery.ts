@@ -1,11 +1,20 @@
 export type ActiveView = "timeline" | "explorer" | "places" | "people";
-export type TimeScale = "years" | "months" | "days" | "all";
+export type TimeScale = "years" | "months" | "days";
+export type CatalogStyle = "list" | "small" | "medium" | "large";
 export type ThemeMode = "light" | "dark";
+
+export interface FolderItem {
+  id: number;
+  name: string;
+  count: number;
+  created_at: number;
+}
 
 export interface PhotoItem {
   id: number;
   path: string;
   file_name: string;
+  name?: string;
   original_extension?: string;
   size: number;
   mtime: number;
@@ -15,15 +24,23 @@ export interface PhotoItem {
   camera_model?: string;
   lens_model?: string;
   focal_length_mm?: number;
+  focal_length?: string;
   aperture_f_number?: number;
+  f_number?: string;
   shutter_speed_seconds?: string;
+  exposure_time?: string;
   iso_equivalent?: number;
+  iso?: string;
   color_space?: string;
   captured_at?: number;
+  created_at?: number;
   latitude?: number;
   longitude?: number;
   altitude_meters?: number;
+  altitude?: number;
   location_name?: string;
+  city?: string;
+  country?: string;
   is_favorite: boolean;
   is_screenshot: boolean;
   is_video: boolean;
@@ -37,11 +54,16 @@ export interface PhotoItem {
   is_hidden: boolean;
   is_trashed: boolean;
   quality_score?: number;
+  blur_score?: number;
   category: string;
   label?: string | null;
   thumb?: string;
   detected_faces?: FaceBox[];
+  faces?: any[];
   ocr_text?: string;
+  dup_count?: number;
+  face_count?: number;
+  person_names?: string;
 }
 
 export interface FaceBox {
@@ -101,6 +123,17 @@ export interface LibraryStats {
   candidates: number;
   keep: number;
   noise: number;
+  panoramas?: number;
+  documents?: number;
+  shared_albums?: number;
+  shared_with_you?: number;
+  partner_sharing?: number;
+  travel?: number;
+  imports?: number;
+  prores?: number;
+  slomo?: number;
+  timelapse?: number;
+  screen_recordings?: number;
 }
 
 export interface SyncDevice {
@@ -117,9 +150,34 @@ export interface SyncStatus {
   service_name: string;
   vault_id: string;
   sas_pin: string;
+  pin_expires_in?: number | null;
+  pin_ttl?: number;
   tls_version: string;
   mesh_active: boolean;
   port: number;
+  local_ip?: string;
+  hostname?: string;
+  tunnel_enabled?: boolean;
+  tunnel_url?: string | null;
   pwa_url: string;
+  pwa_url_direct?: string;
+  pwa_url_hostname?: string;
+  pwa_url_tunnel?: string | null;
   devices: SyncDevice[];
+}
+
+export interface FolderPreset {
+  name: string;
+  path: string;
+  icon: string;
+  exists: boolean;
+}
+
+export interface ScanSummary {
+  seen: number;
+  added: number;
+  updated: number;
+  unchanged: number;
+  unreadable: number;
+  duplicate_groups: number;
 }

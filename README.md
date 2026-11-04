@@ -144,6 +144,75 @@ neural-gallery serve
 
 ---
 
+## 🚀 Running the Server & Testing the Application
+
+Neural Gallery consists of a Python Core API backend and a React 19 + TypeScript frontend. You can run and test both components simultaneously:
+
+### 1. Start the Servers
+
+In separate terminal windows or background processes:
+
+```bash
+# Terminal 1: Start Python Core Backend & REST API (Port 8765)
+source .venv/bin/activate
+neural-gallery serve
+# Or directly via module:
+./.venv/bin/python -m neural_gallery.cli serve
+
+# Terminal 2: Start React Frontend with Hot Module Replacement (Port 1420)
+npm run dev
+```
+
+### 2. Active Endpoints & Access URLs
+
+| Component | Port | Local URL | Description |
+| :--- | :--- | :--- | :--- |
+| **Vite Dev Server (HMR)** | `1420` | [http://localhost:1420/](http://localhost:1420/) | Active development frontend with Hot Module Replacement (proxies API & media calls to `:8765`) |
+| **Python Backend & Web App** | `8765` | [http://127.0.0.1:8765/](http://127.0.0.1:8765/) | Full web application serving the production bundle, SQLite index, and REST endpoints |
+| **Mobile P2P Ingest PWA** | `8765` | [http://127.0.0.1:8765/sync](http://127.0.0.1:8765/sync) | Mobile phone photo upload, pairing, and ingestion interface |
+| **Prototype Preview** | `8765` | [http://127.0.0.1:8765/preview](http://127.0.0.1:8765/preview) | Standalone interactive glassmorphic UI prototype |
+| **Library Statistics** | `8765` | [http://127.0.0.1:8765/api/stats](http://127.0.0.1:8765/api/stats) | JSON summary of photos, faces, duplicates, and categories |
+| **Sync Status** | `8765` | [http://127.0.0.1:8765/api/sync/status](http://127.0.0.1:8765/api/sync/status) | Real-time mesh connection status, active SAS PIN, and pairing states |
+
+### 3. Mobile P2P Sync Testing (Phone to Mac)
+
+When `neural-gallery serve` or `neural-gallery sync` is running, you can connect your iOS or Android device using any of the following methods:
+
+* **Universal Tunnel (Cloudflare Edge):**
+  Auto-spawns when Cloudflare is detected. Bypasses router AP isolation and works across cellular networks (4G/5G) or guest Wi-Fi:
+  ```text
+  https://<tunnel-id>.trycloudflare.com/sync?pin=<PIN>
+  ```
+  *(Features an instant ON/OFF switch in the UI for complete air-gap isolation).*
+* **Direct Local Wi-Fi IP:**
+  Connects directly over your home Wi-Fi network:
+  ```text
+  http://<your-mac-local-ip>:8765/sync?pin=<PIN>
+  ```
+* **mDNS Hostname (Apple Bonjour):**
+  Resolves automatically on iPhones and iPads:
+  ```text
+  http://<Mac-Name>.local:8765/sync?pin=<PIN>
+  ```
+* **Dynamic Anti-Brute-Force OTP:**
+  The 6-digit SAS pairing PIN auto-rotates every 60 seconds with an active countdown timer until paired.
+
+### 4. Health & Smoke Test Verification
+
+You can quickly verify that the application and API layers are running properly:
+
+```bash
+# Verify backend HTTP/1.1 response
+curl -I http://127.0.0.1:8765/
+
+# Verify database index stats
+curl -s http://127.0.0.1:8765/api/stats | jq .
+
+# Verify Vite dev server and proxying
+curl -I http://localhost:1420/
+curl -s http://localhost:1420/api/stats | jq .
+```
+
 ## CLI Commands
 
 | Command | Description |
