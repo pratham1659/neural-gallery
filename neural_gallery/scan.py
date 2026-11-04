@@ -309,10 +309,11 @@ def index_file(path: Path) -> dict | None:
     }
 
 
-def scan_folder(folder: Path, db_path: Path) -> dict:
+def scan_folder(folder: Path, db_path: Path, copy_to_vault: bool = False) -> dict:
     folder = folder.expanduser().resolve()
     if not folder.is_dir():
         raise NotADirectoryError(str(folder))
+
     connection = connect(db_path)
     try:
         connection.execute("INSERT OR IGNORE INTO roots(path) VALUES (?)", (str(folder),))
@@ -329,13 +330,32 @@ def scan_folder(folder: Path, db_path: Path) -> dict:
                 "SELECT size, mtime FROM files WHERE path = ?",
                 (resolved,),
             ).fetchone()
-            if row and row["size"] == stat.st_size and row["mtime"] == stat.st_mtime:
+            if row and row["size"] == stat.st_size and row["mtime"] == stat.st_mtime and not copy_to_vault:
                 skipped += 1
                 continue
             record = index_file(path)
             if record is None:
                 unreadable += 1
                 continue
+
+            # Managed Vault Ingestion (Safe SSD Storage)
+            if copy_to_vault:
+                try:
+                    from neural_gallery.vault_storage import ingest_file_into_vault
+                    vault_dest = ingest_file_into_vault(path, record.get("captured_at"))
+                    if vault_dest != path:
+                        record["path"] = str(vault_dest)
+                        record["file_name"] = vault_dest.name
+                        dest_stat = vault_dest.stat()
+                        record["size"] = dest_stat.st_size
+                        record["mtime"] = dest_stat.st_mtime
+                        resolved = str(vault_dest.resolve())
+                        row = connection.execute(
+                            "SELECT size, mtime FROM files WHERE path = ?",
+                            (resolved,),
+                        ).fetchone()
+                except Exception as exc:
+                    print(f"Warning: could not ingest {path} into vault: {exc}", flush=True)
             if row is None:
                 connection.execute(
                     """

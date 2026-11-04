@@ -24,6 +24,7 @@ import { SyncModal } from "./components/sync/SyncModal";
 import { LockScreenModal } from "./components/auth/LockScreenModal";
 import { IndexFolderModal } from "./components/dialogs/IndexFolderModal";
 import { EnlargedPhotoModal } from "./components/dialogs/EnlargedPhotoModal";
+import { HiddenVaultView } from "./components/views/HiddenVaultView";
 
 export const App: React.FC = () => {
   // Navigation & View State
@@ -96,15 +97,25 @@ export const App: React.FC = () => {
   const [isLocked, setIsLocked] = useState<boolean>(() => {
     return typeof window !== "undefined" && sessionStorage.getItem("neural_vault_locked") === "true";
   });
+  const [isHiddenVaultUnlocked, setIsHiddenVaultUnlocked] = useState<boolean>(false);
 
   const handleLockVault = () => {
     setIsLocked(true);
+    setIsHiddenVaultUnlocked(false);
     sessionStorage.setItem("neural_vault_locked", "true");
   };
 
   const handleUnlockVault = () => {
     setIsLocked(false);
     sessionStorage.removeItem("neural_vault_locked");
+  };
+
+  const handleLockHiddenVault = () => {
+    setIsHiddenVaultUnlocked(false);
+  };
+
+  const handleUnlockHiddenVault = () => {
+    setIsHiddenVaultUnlocked(true);
   };
 
   const [isIndexFolderOpen, setIsIndexFolderOpen] = useState(false);
@@ -461,9 +472,47 @@ export const App: React.FC = () => {
 
   // Folder Handlers (keep photos separate)
   const handleCreateFolder = async (name: string) => {
-    const created = await api.createFolder(name);
+    const created = await api.createFolder(name, false);
     setFolders((prev) => [...prev, created]);
     setCurrentCategory(`folder:${created.id}`);
+  };
+
+  const handleCreateHiddenFolder = async (name: string) => {
+    const created = await api.createFolder(name, true);
+    setFolders((prev) => [...prev, created]);
+    setCurrentCategory(`folder:${created.id}`);
+    await refreshData();
+  };
+
+  const handleToggleHidePhoto = async (id: number, currentHidden: boolean) => {
+    try {
+      await api.setPhotoHidden(id, !currentHidden);
+      await refreshData();
+    } catch (err) {
+      console.error("Failed to toggle photo hidden:", err);
+    }
+  };
+
+  const handleBulkHide = async () => {
+    if (selectedPhotoIds.size === 0) return;
+    try {
+      await api.setPhotosHiddenBulk(Array.from(selectedPhotoIds), true);
+      setSelectedPhotoIds(new Set());
+      await refreshData();
+    } catch (err) {
+      console.error("Failed to bulk hide photos:", err);
+    }
+  };
+
+  const handleBulkUnhide = async () => {
+    if (selectedPhotoIds.size === 0) return;
+    try {
+      await api.setPhotosHiddenBulk(Array.from(selectedPhotoIds), false);
+      setSelectedPhotoIds(new Set());
+      await refreshData();
+    } catch (err) {
+      console.error("Failed to bulk unhide photos:", err);
+    }
   };
 
   const handleDeleteFolder = async (id: number) => {
@@ -787,6 +836,9 @@ export const App: React.FC = () => {
         onFavoriteSelected={handleBulkFavorite}
         onRemoveFavoriteSelected={handleRemoveFavoritesSelected}
         onRestoreSelected={() => handleRestorePhotos(Array.from(selectedPhotoIds))}
+        onHideSelected={handleBulkHide}
+        onUnhideSelected={handleBulkUnhide}
+        isHiddenCategory={currentCategory === "hidden" || (currentCategory.startsWith("folder:") && folders.some(f => f.is_hidden && currentCategory === `folder:${f.id}`))}
         isTrashCategory={currentCategory === "trash"}
       />
 
@@ -831,75 +883,111 @@ export const App: React.FC = () => {
             onDeleteFolder={(folder) => setFolderToDelete(folder)}
             onDropOnFolder={handleDropOnFolder}
             onDropOnCategory={handleDropOnCategory}
+            isHiddenVaultUnlocked={isHiddenVaultUnlocked}
+            onUnlockHiddenVault={handleUnlockHiddenVault}
+            onLockHiddenVault={handleLockHiddenVault}
           />
         </div>
 
         {/* Center Main View */}
         <main className="flex-1 flex flex-col h-full overflow-hidden bg-[var(--window-bg)] min-w-0">
-          {activeView === "timeline" && (
-            <TimelineView
-              photos={photos}
-              selectedPhoto={selectedPhoto}
-              selectedPhotoIds={selectedPhotoIds}
-              onPhotoClick={handlePhotoClick}
-              onToggleSelectPhoto={handleToggleSelectPhoto}
+          {currentCategory === "hidden" ||
+          (currentCategory.startsWith("folder:") &&
+            folders.some((f) => f.is_hidden && currentCategory === `folder:${f.id}`)) ? (
+            <HiddenVaultView
+              isUnlocked={isHiddenVaultUnlocked}
+              onUnlock={handleUnlockHiddenVault}
+              onLock={handleLockHiddenVault}
+              hiddenPhotos={photos}
+              hiddenFolders={folders.filter((f) => !!f.is_hidden)}
+              selectedFolderId={
+                currentCategory.startsWith("folder:")
+                  ? parseInt(currentCategory.split("folder:")[1], 10)
+                  : null
+              }
+              onSelectFolder={(folderId) => {
+                if (folderId) setCurrentCategory(`folder:${folderId}`);
+                else setCurrentCategory("hidden");
+              }}
+              onCreateFolder={handleCreateHiddenFolder}
+              onDeleteFolder={(folder) => setFolderToDelete(folder)}
+              onSelectPhoto={handlePhotoClick}
               onEnlargePhoto={(p) => {
                 setSelectedPhoto(p);
                 setIsEnlargedOpen(true);
               }}
-              onToggleFavorite={handleToggleFavorite}
-              timeScale={timeScale}
-              catalogStyle={catalogStyle}
-              sortOrder={sortOrder}
-              isTrashCategory={currentCategory === "trash"}
-              onRestorePhoto={(id) => handleRestorePhotos([id])}
-              onEmptyTrash={() => setIsEmptyTrashConfirmOpen(true)}
-              onRestoreAll={handleRestoreAllTrash}
-              onSelectSectionPhotos={handleSelectSectionPhotos}
-              onDropOnCategorySection={handleDropOnCategory}
-            />
-          )}
-
-          {activeView === "explorer" && (
-            <ExplorerView
-              photos={photos}
-              selectedPhoto={selectedPhoto}
+              onUnhidePhoto={(id) => handleToggleHidePhoto(id, true)}
               selectedPhotoIds={selectedPhotoIds}
-              onPhotoClick={handlePhotoClick}
-              onToggleSelectPhoto={handleToggleSelectPhoto}
-              onSelectAll={handleSelectAll}
-              onClearSelection={handleClearSelection}
-              onEnlargePhoto={(p) => {
-                setSelectedPhoto(p);
-                setIsEnlargedOpen(true);
-              }}
-              onKeepPhoto={handleKeepPhoto}
-              onTrashPhoto={handleTrashPhoto}
-              onToggleFavorite={handleToggleFavorite}
               catalogStyle={catalogStyle}
-              isTrashCategory={currentCategory === "trash"}
-              onRestorePhoto={(id) => handleRestorePhotos([id])}
-              onEmptyTrash={() => setIsEmptyTrashConfirmOpen(true)}
-              onRestoreAll={handleRestoreAllTrash}
             />
-          )}
+          ) : (
+            <>
+              {activeView === "timeline" && (
+                <TimelineView
+                  photos={photos}
+                  selectedPhoto={selectedPhoto}
+                  selectedPhotoIds={selectedPhotoIds}
+                  onPhotoClick={handlePhotoClick}
+                  onToggleSelectPhoto={handleToggleSelectPhoto}
+                  onEnlargePhoto={(p) => {
+                    setSelectedPhoto(p);
+                    setIsEnlargedOpen(true);
+                  }}
+                  onToggleFavorite={handleToggleFavorite}
+                  timeScale={timeScale}
+                  catalogStyle={catalogStyle}
+                  sortOrder={sortOrder}
+                  isTrashCategory={currentCategory === "trash"}
+                  onRestorePhoto={(id) => handleRestorePhotos([id])}
+                  onEmptyTrash={() => setIsEmptyTrashConfirmOpen(true)}
+                  onRestoreAll={handleRestoreAllTrash}
+                  onSelectSectionPhotos={handleSelectSectionPhotos}
+                  onDropOnCategorySection={handleDropOnCategory}
+                />
+              )}
 
-          {activeView === "places" && (
-            <PlacesMapView
-              pins={mapPins}
-              onSelectPinPhoto={(photoId) => {
-                const found = photos.find((p) => p.id === photoId);
-                if (found) setSelectedPhoto(found);
-              }}
-            />
-          )}
+              {activeView === "explorer" && (
+                <ExplorerView
+                  photos={photos}
+                  selectedPhoto={selectedPhoto}
+                  selectedPhotoIds={selectedPhotoIds}
+                  onPhotoClick={handlePhotoClick}
+                  onToggleSelectPhoto={handleToggleSelectPhoto}
+                  onSelectAll={handleSelectAll}
+                  onClearSelection={handleClearSelection}
+                  onEnlargePhoto={(p) => {
+                    setSelectedPhoto(p);
+                    setIsEnlargedOpen(true);
+                  }}
+                  onKeepPhoto={handleKeepPhoto}
+                  onTrashPhoto={handleTrashPhoto}
+                  onToggleFavorite={handleToggleFavorite}
+                  catalogStyle={catalogStyle}
+                  isTrashCategory={currentCategory === "trash"}
+                  onRestorePhoto={(id) => handleRestorePhotos([id])}
+                  onEmptyTrash={() => setIsEmptyTrashConfirmOpen(true)}
+                  onRestoreAll={handleRestoreAllTrash}
+                />
+              )}
 
-          {activeView === "people" && (
-            <PeopleView
-              people={people}
-              candidates={candidates}
-              onConfirmCandidate={handleConfirmCandidate}
-            />
+              {activeView === "places" && (
+                <PlacesMapView
+                  pins={mapPins}
+                  onSelectPinPhoto={(photoId) => {
+                    const found = photos.find((p) => p.id === photoId);
+                    if (found) setSelectedPhoto(found);
+                  }}
+                />
+              )}
+
+              {activeView === "people" && (
+                <PeopleView
+                  people={people}
+                  candidates={candidates}
+                  onConfirmCandidate={handleConfirmCandidate}
+                />
+              )}
+            </>
           )}
         </main>
 
@@ -915,6 +1003,7 @@ export const App: React.FC = () => {
                 photo={selectedPhoto}
                 onClose={() => setIsInspectorOpen(false)}
                 onToggleFavorite={handleToggleFavorite}
+                onToggleHide={handleToggleHidePhoto}
                 onEnlargePhoto={(p) => {
                   setSelectedPhoto(p);
                   setIsEnlargedOpen(true);

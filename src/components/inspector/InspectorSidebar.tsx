@@ -14,6 +14,7 @@ import {
   Image as ImageIcon,
   Info,
   Layers,
+  Lock,
   MapPin,
   Maximize2,
   Sliders,
@@ -31,6 +32,7 @@ interface InspectorSidebarProps {
   photo: PhotoItem | null;
   onClose: () => void;
   onToggleFavorite: (id: number, current: boolean) => void;
+  onToggleHide?: (id: number, currentHidden: boolean) => void;
   onEnlargePhoto?: (photo: PhotoItem) => void;
 }
 
@@ -104,6 +106,7 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
   photo,
   onClose,
   onToggleFavorite,
+  onToggleHide,
   onEnlargePhoto,
 }) => {
   const [detail, setDetail] = useState<PhotoItem | null>(photo);
@@ -236,6 +239,24 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
               <Maximize2 size={16} />
               <span>Enlarge Photo</span>
             </div>
+          )}
+
+          {/* Quick Hide in Vault Button */}
+          {onToggleHide && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleHide(current.id, !!current.is_hidden);
+              }}
+              className={`absolute top-2 left-2 p-1.5 rounded-full backdrop-blur-md transition-all z-10 ${
+                current.is_hidden
+                  ? "bg-indigo-600 text-white shadow"
+                  : "bg-black/40 text-white/80 hover:scale-110"
+              }`}
+              title={current.is_hidden ? "Unhide from Vault" : "Hide in Hidden Vault (Touch ID protected)"}
+            >
+              {current.is_hidden ? <Eye size={14} /> : <Lock size={14} />}
+            </button>
           )}
 
           <button

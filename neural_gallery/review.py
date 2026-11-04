@@ -1264,6 +1264,10 @@ def make_handler(db_path: Path):
                     connection.close()
                 self._json(200, candidates)
                 return
+            if parsed.path == "/api/vault/storage":
+                from neural_gallery.vault_storage import get_vault_info
+                self._json(200, get_vault_info())
+                return
             if parsed.path == "/api/sync/status":
                 self._json(200, sync_status(port=self.server.server_address[1]))
                 return
@@ -1272,6 +1276,7 @@ def make_handler(db_path: Path):
                 try:
                     rows = connection.execute("""
                         SELECT shared_albums.id, shared_albums.name, shared_albums.created_at,
+                               COALESCE(shared_albums.is_hidden, 0) AS is_hidden,
                                COUNT(shared_album_files.file_id) AS count
                         FROM shared_albums
                         LEFT JOIN shared_album_files ON shared_album_files.album_id = shared_albums.id
@@ -1279,7 +1284,13 @@ def make_handler(db_path: Path):
                         ORDER BY shared_albums.id ASC
                     """).fetchall()
                     folders = [
-                        {"id": r["id"], "name": r["name"], "created_at": r["created_at"], "count": r["count"]}
+                        {
+                            "id": r["id"],
+                            "name": r["name"],
+                            "created_at": r["created_at"],
+                            "is_hidden": bool(r["is_hidden"]),
+                            "count": r["count"],
+                        }
                         for r in rows
                     ]
                     self._json(200, folders)
@@ -1446,7 +1457,13 @@ def make_handler(db_path: Path):
                                 file_bytes = part[hdr_end + 4:].rstrip(b"\r\n--")
                                 break
 
-                incoming_folder = Path.home() / "Pictures" / "Neural Gallery Imports"
+                try:
+                    from neural_gallery.vault_storage import get_vault_config, ensure_vault_structure
+                    cfg = get_vault_config()
+                    vault_dirs = ensure_vault_structure(Path(cfg["vault_path"]))
+                    incoming_folder = vault_dirs["originals"] / "Imports"
+                except Exception:
+                    incoming_folder = Path.home() / "Pictures" / "Neural Gallery Imports"
                 res = get_sync_engine().ingest_bytes(filename, file_bytes, incoming_folder, db_path)
                 self._json(200, res)
                 return
@@ -1456,15 +1473,39 @@ def make_handler(db_path: Path):
                 if payload is None:
                     return
                 folder = payload.get("folder")
+                copy_to_vault = payload.get("copy_to_vault")
+                if copy_to_vault is None:
+                    try:
+                        from neural_gallery.vault_storage import get_vault_config
+                        copy_to_vault = bool(get_vault_config().get("managed_ingest", False))
+                    except Exception:
+                        copy_to_vault = False
                 if not isinstance(folder, str) or not folder.strip():
                     self._json(400, {"error": "folder is required"})
                     return
                 try:
-                    summary = scan_folder(Path(folder), db_path)
+                    summary = scan_folder(Path(folder), db_path, copy_to_vault=copy_to_vault)
                 except NotADirectoryError:
                     self._json(400, {"error": "that folder does not exist"})
                     return
                 self._json(200, summary)
+                return
+
+            if parsed.path == "/api/vault/storage":
+                payload = self._payload()
+                if payload is None:
+                    return
+                from neural_gallery.vault_storage import set_vault_location
+                new_path = payload.get("vault_path")
+                managed_ingest = payload.get("managed_ingest", True)
+                if not new_path:
+                    self._json(400, {"error": "vault_path is required"})
+                    return
+                try:
+                    info = set_vault_location(new_path, managed_ingest)
+                    self._json(200, info)
+                except Exception as exc:
+                    self._json(400, {"error": str(exc)})
                 return
 
             if parsed.path == "/api/folders/choose":
@@ -1493,6 +1534,7 @@ def make_handler(db_path: Path):
                 "/api/folders/delete",
                 "/api/folders/add",
                 "/api/folders/remove",
+                "/api/vault/storage",
                 "/api/person/confirm",
                 "/api/person/merge",
                 "/api/sync/pair",
@@ -1582,17 +1624,18 @@ def make_handler(db_path: Path):
 
                 if parsed.path == "/api/folders":
                     name = (payload.get("name") or "").strip()
+                    is_hidden = 1 if payload.get("is_hidden") else 0
                     if not name:
                         self._json(400, {"error": "folder name is required"})
                         return
                     cur = connection.cursor()
                     cur.execute(
-                        "INSERT INTO shared_albums (name, album_type, created_at) VALUES (?, 'folder', ?)",
-                        (name, time.time()),
+                        "INSERT INTO shared_albums (name, album_type, is_hidden, created_at) VALUES (?, 'folder', ?, ?)",
+                        (name, is_hidden, time.time()),
                     )
                     folder_id = cur.lastrowid
                     connection.commit()
-                    self._json(200, {"id": folder_id, "name": name, "count": 0})
+                    self._json(200, {"id": folder_id, "name": name, "is_hidden": bool(is_hidden), "count": 0})
                     return
 
                 if parsed.path == "/api/folders/delete":
@@ -1611,12 +1654,16 @@ def make_handler(db_path: Path):
                     raw_ids = payload.get("file_ids") or payload.get("ids") or []
                     if isinstance(raw_ids, int):
                         raw_ids = [raw_ids]
+                    album_row = connection.execute("SELECT is_hidden FROM shared_albums WHERE id = ?", (folder_id,)).fetchone()
+                    is_folder_hidden = bool(album_row and album_row[0])
                     for fid in raw_ids:
                         if isinstance(fid, int):
                             connection.execute(
                                 "INSERT OR IGNORE INTO shared_album_files (album_id, file_id) VALUES (?, ?)",
                                 (folder_id, fid),
                             )
+                            if is_folder_hidden:
+                                connection.execute("UPDATE files SET is_hidden = 1 WHERE id = ?", (fid,))
                     connection.commit()
                     self._json(200, {"success": True, "folder_id": folder_id, "count": len(raw_ids)})
                     return

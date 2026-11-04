@@ -14,6 +14,9 @@ interface SidebarProps {
   onDeleteFolder?: (folder: FolderItem) => void;
   onDropOnFolder?: (folderId: number, photoIds: number[]) => Promise<void>;
   onDropOnCategory?: (category: string, photoIds: number[]) => Promise<void>;
+  isHiddenVaultUnlocked?: boolean;
+  onUnlockHiddenVault?: () => void;
+  onLockHiddenVault?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -28,11 +31,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onDeleteFolder,
   onDropOnFolder,
   onDropOnCategory,
+  isHiddenVaultUnlocked = false,
+  onUnlockHiddenVault,
+  onLockHiddenVault,
 }) => {
   const [videosExpanded, setVideosExpanded] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+
+  const regularFolders = folders.filter((f) => !f.is_hidden);
+  const hiddenFolders = folders.filter((f) => !!f.is_hidden);
 
   const handleCreateFolderSubmit = async () => {
     if (!newFolderName.trim() || !onCreateFolder) return;
@@ -369,7 +378,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {/* Folder items list */}
           <div className="space-y-0.5">
-            {folders.map((folder) => {
+            {regularFolders.map((folder) => {
               const isCurrent = currentCategory === `folder:${folder.id}`;
               const isDropTarget = dropTarget === `folder:${folder.id}`;
 
@@ -422,7 +431,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               );
             })}
 
-            {folders.length === 0 && !isCreatingFolder && (
+            {regularFolders.length === 0 && !isCreatingFolder && (
               <div
                 onClick={() => setIsCreatingFolder(true)}
                 className="px-2.5 py-1.5 rounded-lg border border-dashed border-[var(--glass-border)] text-[11px] text-[var(--text-muted)] hover:text-[var(--text-main)] hover:border-[var(--accent)] transition-all cursor-pointer flex items-center gap-1.5"
@@ -800,24 +809,75 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="text-[11px] text-[var(--text-muted)]">{stats.unlabeled}</span>
             </button>
 
-            <button
-              onClick={() => onSelectCategory("hidden")}
-              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
-                currentCategory === "hidden"
-                  ? "bg-[var(--accent)] text-white shadow-sm"
-                  : "text-[var(--text-main)] hover:bg-[var(--button-hover)]"
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <img
-                  src="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Locked%20with%20key/3D/locked_with_key_3d.png"
-                  alt=""
-                  className="w-4 h-4 object-contain"
-                />
-                <span>Hidden Vault</span>
+            {/* Hidden Vault with 3D Lock/Unlock Icon & Nested Private Folders */}
+            <div>
+              <div
+                onClick={() => onSelectCategory("hidden")}
+                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all cursor-pointer ${
+                  currentCategory === "hidden"
+                    ? "bg-[var(--accent)] text-white shadow-sm"
+                    : "text-[var(--text-main)] hover:bg-[var(--button-hover)]"
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <img
+                    src={
+                      isHiddenVaultUnlocked
+                        ? "https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Unlocked/3D/unlocked_3d.png"
+                        : "https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Locked%20with%20key/3D/locked_with_key_3d.png"
+                    }
+                    alt=""
+                    className="w-4 h-4 object-contain"
+                  />
+                  <span>Hidden Vault</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-[11px] ${currentCategory === "hidden" ? "text-white/80" : "text-[var(--text-muted)]"}`}>
+                    {stats.hidden}
+                  </span>
+                  {isHiddenVaultUnlocked && onLockHiddenVault && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onLockHiddenVault();
+                      }}
+                      className="p-0.5 rounded hover:bg-black/10 text-[10px]"
+                      title="Lock Hidden Vault"
+                    >
+                      🔒
+                    </button>
+                  )}
+                </div>
               </div>
-              <span className="text-[11px] text-[var(--text-muted)]">{stats.hidden}</span>
-            </button>
+
+              {/* Nested Private Folders when Hidden Vault is unlocked */}
+              {isHiddenVaultUnlocked && hiddenFolders.length > 0 && (
+                <div className="pl-6 pr-1 py-1 space-y-0.5 border-l-2 border-indigo-500/30 ml-4 mt-1">
+                  {hiddenFolders.map((hf) => {
+                    const isSelected = currentCategory === `folder:${hf.id}`;
+                    return (
+                      <div
+                        key={hf.id}
+                        onClick={() => onSelectCategory(`folder:${hf.id}`)}
+                        className={`w-full flex items-center justify-between px-2 py-1 rounded text-[12px] transition-all cursor-pointer ${
+                          isSelected
+                            ? "bg-indigo-600 text-white font-medium"
+                            : "text-[var(--text-secondary)] hover:bg-[var(--button-hover)]"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <Folder size={12} className={isSelected ? "text-white" : "text-indigo-400"} />
+                          <span className="truncate">{hf.name}</span>
+                        </div>
+                        <span className="text-[10px] opacity-75 font-mono shrink-0 ml-1">
+                          {hf.count}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             <button
               onClick={() => onSelectCategory("imports")}
