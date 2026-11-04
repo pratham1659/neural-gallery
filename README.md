@@ -70,6 +70,50 @@ npm run build
 
 ---
 
+## Installation & Packaging
+
+### Method 1: Homebrew Cask (Recommended)
+
+Install Neural Gallery natively on Apple Silicon macOS via Homebrew:
+
+```bash
+brew install --cask Casks/neural-gallery.rb
+# Or once tapped:
+# brew install --cask neural-gallery
+```
+
+### Method 2: GitHub Releases (.dmg)
+
+1. Download the latest `Neural_Gallery_2.0.0_aarch64.dmg` from [GitHub Releases](https://github.com/pratham1659/neural-gallery/releases).
+2. Double-click the `.dmg` and drag **Neural Gallery** into your `/Applications` folder.
+3. *Note on Open-Source Distribution:* Because Neural Gallery is 100% free open-source software built with ad-hoc signing, macOS Gatekeeper may flag it on first launch. To permit launch, run:
+   ```bash
+   xattr -cr "/Applications/Neural Gallery.app"
+   ```
+   Or right-click the app in Finder and choose **Open**.
+
+### Method 3: Build Standalone DMG from Source
+
+You can build the native ARM64 `.app` and `.dmg` locally:
+
+```bash
+# Build the native Swift bridge and frontend assets, then assemble the DMG
+./scripts/build_dmg.sh
+
+# The resulting installer is generated at:
+# dist-dmg/Neural_Gallery_2.0.0_aarch64.dmg
+```
+
+---
+
+## Continuous Integration & Release Automation
+
+Neural Gallery employs automated GitHub Actions workflows running on Apple Silicon (`macos-14` M1):
+* **CI Workflow (`.github/workflows/ci.yml`):** Automatically tests every Pull Request and branch push across Python 3.11, Swift dynamic bridge compilation, Rust Tauri core unit tests, Vite bundle build, and the full 65-test integration suite.
+* **Release Workflow (`.github/workflows/release.yml`):** Automatically triggered on version tags (`v*`), compiles native binaries, packages the `.dmg`, computes SHA-256 checksums, and publishes GitHub Release assets.
+
+---
+
 ## Quickstart
 
 ### Requirements
