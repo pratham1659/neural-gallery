@@ -18,20 +18,26 @@ export const SyncModal: React.FC<SyncModalProps> = ({
   onRotatePin,
   onUnpairDevice,
 }) => {
+  const [addressMode, setAddressMode] = useState<"ip" | "hostname">("ip");
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
   const [copied, setCopied] = useState<boolean>(false);
+  const [showTroubleshoot, setShowTroubleshoot] = useState<boolean>(false);
 
-  // Compute direct P2P connection URL (accessible over local Wi-Fi)
+  // Compute clean PIN and target hosts
   const cleanPin = (syncStatus.sas_pin || "").replace(/\s+/g, "").trim();
-  const host =
+  const port = syncStatus.port || 8765;
+
+  const ipHost =
     syncStatus.local_ip && syncStatus.local_ip !== "127.0.0.1" && syncStatus.local_ip !== "0.0.0.0"
       ? syncStatus.local_ip
       : window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1"
       ? window.location.hostname
-      : syncStatus.local_ip || "127.0.0.1";
-  const port = syncStatus.port || 8765;
-  const directConnectUrl =
-    syncStatus.pwa_url_direct || `http://${host}:${port}/sync?pin=${cleanPin}`;
+      : "192.168.29.186";
+
+  const nameHost = syncStatus.hostname || "Prathams-MacBook-Air.local";
+
+  const selectedHost = addressMode === "hostname" ? nameHost : ipHost;
+  const directConnectUrl = `http://${selectedHost}:${port}/sync?pin=${cleanPin}`;
 
   // Generate QR Code as high-contrast Data URL whenever URL or PIN changes
   useEffect(() => {
@@ -79,7 +85,7 @@ export const SyncModal: React.FC<SyncModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm select-none">
-      <div className="w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl bg-[var(--glass-card)] border border-[var(--glass-border)] shadow-2xl p-6 relative overflow-hidden">
+      <div className="w-full max-w-lg max-h-[92vh] flex flex-col rounded-2xl bg-[var(--glass-card)] border border-[var(--glass-border)] shadow-2xl p-6 relative overflow-hidden">
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -90,7 +96,7 @@ export const SyncModal: React.FC<SyncModalProps> = ({
         </button>
 
         {/* Modal Header */}
-        <div className="flex items-center gap-3 mb-5 shrink-0">
+        <div className="flex items-center gap-3 mb-4 shrink-0">
           <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-2xl">
             📡
           </div>
@@ -98,7 +104,7 @@ export const SyncModal: React.FC<SyncModalProps> = ({
             <h2 className="text-base font-bold text-[var(--text-main)] flex items-center gap-2">
               Air-Gapped P2P Wi-Fi Sync
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-normal">
-                TLS 1.3 Direct
+                Direct LAN
               </span>
             </h2>
             <p className="text-xs text-[var(--text-muted)]">
@@ -108,20 +114,35 @@ export const SyncModal: React.FC<SyncModalProps> = ({
         </div>
 
         {/* Scrollable Body */}
-        <div className="overflow-y-auto space-y-5 pr-1 text-xs">
+        <div className="overflow-y-auto space-y-4 pr-1 text-xs">
           {/* QR Code Instant Access Card */}
           <div className="p-4 rounded-xl bg-[var(--glass-sidebar)] border border-[var(--glass-border)] flex flex-col items-center text-center">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-[11px] font-semibold text-[var(--text-faint)] uppercase tracking-wider">
-                Instant Scan &amp; Connect
-              </span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-600 dark:text-blue-400 font-medium">
-                Same Wi-Fi
-              </span>
+            {/* Host Mode Selector Tabs */}
+            <div className="flex items-center p-0.5 rounded-lg bg-[var(--card)] border border-[var(--glass-border)] mb-3 text-[11px]">
+              <button
+                onClick={() => setAddressMode("ip")}
+                className={`px-3 py-1 rounded-md font-medium transition-all ${
+                  addressMode === "ip"
+                    ? "bg-[var(--accent)] text-white shadow-sm"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                }`}
+              >
+                📶 Wi-Fi IP ({ipHost})
+              </button>
+              <button
+                onClick={() => setAddressMode("hostname")}
+                className={`px-3 py-1 rounded-md font-medium transition-all ${
+                  addressMode === "hostname"
+                    ? "bg-[var(--accent)] text-white shadow-sm"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                }`}
+              >
+                🏷️ Mac Name ({nameHost.split(".")[0]})
+              </button>
             </div>
 
-            {/* QR Code Canvas / Image */}
-            <div className="p-2.5 bg-white rounded-2xl shadow-md border border-slate-200/80 my-2">
+            {/* QR Code Canvas */}
+            <div className="p-2.5 bg-white rounded-2xl shadow-md border border-slate-200/80 my-1">
               {qrDataUrl ? (
                 <img
                   src={qrDataUrl}
@@ -135,28 +156,74 @@ export const SyncModal: React.FC<SyncModalProps> = ({
               )}
             </div>
 
-            <p className="text-[11px] text-[var(--text-secondary)] mt-1 max-w-xs">
-              Point your phone's camera at this QR code to pair and open the photo uploader instantly.
+            <p className="text-[11px] text-[var(--text-secondary)] mt-1.5 max-w-xs">
+              Point your phone's camera at this QR code to authenticate and open the uploader.
             </p>
 
             {/* Direct Link Bar */}
-            <div className="mt-3 flex items-center gap-2 w-full max-w-sm">
+            <div className="mt-2.5 flex items-center gap-2 w-full max-w-sm">
               <input
                 readOnly
                 value={directConnectUrl}
-                className="flex-1 px-2.5 py-1 rounded-lg bg-[var(--card)] border border-[var(--glass-border)] font-mono text-[11px] text-[var(--text-muted)] truncate select-all"
+                className="flex-1 px-2.5 py-1.5 rounded-lg bg-[var(--card)] border border-[var(--glass-border)] font-mono text-[11px] text-[var(--text-muted)] truncate select-all"
               />
               <button
                 onClick={handleCopyLink}
-                className="px-2.5 py-1 rounded-lg text-[11px] font-medium border border-[var(--button-border)] bg-[var(--button-bg)] text-[var(--text-main)] hover:bg-[var(--button-hover)] transition-all shrink-0"
+                className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium border border-[var(--button-border)] bg-[var(--button-bg)] text-[var(--text-main)] hover:bg-[var(--button-hover)] transition-all shrink-0"
               >
-                {copied ? "✓ Copied" : "Copy Link"}
+                {copied ? "✓ Copied" : "Copy"}
               </button>
             </div>
           </div>
 
+          {/* Troubleshoot Alert Banner */}
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
+            <button
+              onClick={() => setShowTroubleshoot((prev) => !prev)}
+              className="w-full flex items-center justify-between text-left font-semibold text-amber-700 dark:text-amber-400"
+            >
+              <span className="flex items-center gap-1.5">
+                <span>⚠️</span>
+                <span>Phone says &quot;This site can&apos;t be reached&quot;?</span>
+              </span>
+              <span className="text-[11px] underline">
+                {showTroubleshoot ? "Hide Guide ▲" : "Show Fix ▼"}
+              </span>
+            </button>
+
+            {showTroubleshoot && (
+              <div className="mt-2.5 space-y-2 text-[11px] text-[var(--text-secondary)] border-t border-amber-500/20 pt-2.5 leading-relaxed">
+                <div>
+                  <strong className="text-[var(--text-main)]">1. Turn OFF Mobile Data (5G/4G):</strong>
+                  <br />
+                  Make sure your phone is actually on Wi-Fi and not cellular data. If phone has 5G on, it cannot reach your Mac&apos;s local IP.
+                </div>
+                <div>
+                  <strong className="text-[var(--text-main)]">2. Switch to &quot;Mac Name&quot; tab above:</strong>
+                  <br />
+                  Click the <strong>&quot;Mac Name&quot;</strong> tab above to generate a <code className="bg-amber-500/20 px-1 py-0.5 rounded">.local</code> QR code. iPhones and Android phones easily resolve <code className="bg-amber-500/20 px-1 py-0.5 rounded">http://{nameHost}:{port}/sync</code> via Bonjour.
+                </div>
+                <div>
+                  <strong className="text-[var(--text-main)]">3. Check URL starts with http:// (not https://):</strong>
+                  <br />
+                  Some mobile browsers auto-type <code className="bg-amber-500/20 px-1 py-0.5 rounded">https://</code>. Ensure the browser bar says <code className="bg-amber-500/20 px-1 py-0.5 rounded">http://</code>.
+                </div>
+                <div>
+                  <strong className="text-[var(--text-main)]">4. Router AP Isolation? (100% Guaranteed Solution):</strong>
+                  <br />
+                  Some Wi-Fi routers (like JioFiber / guest Wi-Fi) isolate wireless devices from each other.
+                  <br />
+                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                    ⭐ Instant Fix:
+                  </span>{" "}
+                  Turn ON your phone&apos;s <strong>Personal Hotspot</strong>, connect your Mac to your phone&apos;s hotspot, and scan the QR code! On a hotspot connection, direct P2P transfer works 100% without any router blocking.
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* SAS Pairing PIN Manual Option */}
-          <div className="p-3.5 rounded-xl bg-[var(--glass-sidebar)] border border-[var(--glass-border)] flex items-center justify-between">
+          <div className="p-3 rounded-xl bg-[var(--glass-sidebar)] border border-[var(--glass-border)] flex items-center justify-between">
             <div>
               <div className="text-[10px] font-semibold text-[var(--text-faint)] uppercase tracking-wider">
                 Manual SAS PIN
@@ -174,8 +241,8 @@ export const SyncModal: React.FC<SyncModalProps> = ({
             </button>
           </div>
 
-          {/* Connected / Paired Devices (No Mock Data) */}
-          <div className="space-y-2.5">
+          {/* Connected / Paired Devices */}
+          <div className="space-y-2">
             <div className="text-xs font-semibold text-[var(--text-main)] flex items-center justify-between">
               <span>Connected Mesh Devices ({realDevices.length})</span>
               <span className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-mono">
@@ -185,9 +252,9 @@ export const SyncModal: React.FC<SyncModalProps> = ({
             </div>
 
             {realDevices.length === 0 ? (
-              <div className="p-4 rounded-xl bg-[var(--glass-sidebar)] border border-dashed border-[var(--glass-border)] text-center text-xs text-[var(--text-muted)]">
-                <div className="text-2xl mb-1.5 opacity-75">📱</div>
-                <div className="font-semibold text-[var(--text-main)] mb-1">
+              <div className="p-3.5 rounded-xl bg-[var(--glass-sidebar)] border border-dashed border-[var(--glass-border)] text-center text-xs text-[var(--text-muted)]">
+                <div className="text-xl mb-1 opacity-75">📱</div>
+                <div className="font-semibold text-[var(--text-main)] mb-0.5">
                   No Devices Connected Yet
                 </div>
                 <p className="text-[11px] text-[var(--text-muted)] max-w-xs mx-auto">

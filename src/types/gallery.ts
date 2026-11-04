@@ -121,8 +121,10 @@ export interface SyncStatus {
   mesh_active: boolean;
   port: number;
   local_ip?: string;
+  hostname?: string;
   pwa_url: string;
   pwa_url_direct?: string;
+  pwa_url_hostname?: string;
   devices: SyncDevice[];
 }
 

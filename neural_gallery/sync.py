@@ -39,6 +39,23 @@ def get_local_ip() -> str:
             return "127.0.0.1"
 
 
+def get_hostname() -> str:
+    """Get the local mDNS hostname (e.g. 'My-MacBook.local') for Bonjour discovery."""
+    import socket
+    import subprocess
+
+    try:
+        res = subprocess.run(["scutil", "--get", "LocalHostName"], capture_output=True, text=True, timeout=2)
+        if res.returncode == 0 and res.stdout.strip():
+            return f"{res.stdout.strip()}.local"
+    except Exception:
+        pass
+    try:
+        return f"{socket.gethostname()}.local"
+    except Exception:
+        return "localhost"
+
+
 class SyncEngine:
     """Zero-Cloud Air-Gapped Peer-to-Peer Wi-Fi Ingestion & Mesh Engine."""
 
@@ -110,9 +127,11 @@ class SyncEngine:
     def get_status(self, host: str | None = None, port: int = 8765) -> dict[str, Any]:
         """Return full peer-to-peer sync status for UI and Bonjour advertising."""
         local_ip = host if host and host not in ("0.0.0.0", "127.0.0.1") else get_local_ip()
+        hostname = get_hostname()
         clean_pin = self._sas_pin.replace(" ", "").strip()
         pwa_url = f"http://{local_ip}:{port}/sync"
         pwa_url_direct = f"http://{local_ip}:{port}/sync?pin={clean_pin}"
+        pwa_url_hostname = f"http://{hostname}:{port}/sync?pin={clean_pin}"
         return {
             "status": "ready",
             "service_name": "_photovault._tcp.local.",
@@ -124,8 +143,10 @@ class SyncEngine:
             "mesh_active": True,
             "port": port,
             "local_ip": local_ip,
+            "hostname": hostname,
             "pwa_url": pwa_url,
             "pwa_url_direct": pwa_url_direct,
+            "pwa_url_hostname": pwa_url_hostname,
         }
 
     def ingest_bytes(
