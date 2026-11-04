@@ -56,6 +56,16 @@ def get_hostname() -> str:
         return "localhost"
 
 
+def get_tunnel_url() -> str | None:
+    """Check for active secure tunnel URL when router blocks local P2P traffic."""
+    p = Path("/tmp/neural_gallery_tunnel.txt")
+    if p.is_file():
+        url = p.read_text().strip()
+        if url.startswith("http"):
+            return url
+    return None
+
+
 class SyncEngine:
     """Zero-Cloud Air-Gapped Peer-to-Peer Wi-Fi Ingestion & Mesh Engine."""
 
@@ -128,10 +138,12 @@ class SyncEngine:
         """Return full peer-to-peer sync status for UI and Bonjour advertising."""
         local_ip = host if host and host not in ("0.0.0.0", "127.0.0.1") else get_local_ip()
         hostname = get_hostname()
+        tunnel_url = get_tunnel_url()
         clean_pin = self._sas_pin.replace(" ", "").strip()
         pwa_url = f"http://{local_ip}:{port}/sync"
         pwa_url_direct = f"http://{local_ip}:{port}/sync?pin={clean_pin}"
         pwa_url_hostname = f"http://{hostname}:{port}/sync?pin={clean_pin}"
+        pwa_url_tunnel = f"{tunnel_url}/sync?pin={clean_pin}" if tunnel_url else None
         return {
             "status": "ready",
             "service_name": "_photovault._tcp.local.",
@@ -144,9 +156,11 @@ class SyncEngine:
             "port": port,
             "local_ip": local_ip,
             "hostname": hostname,
+            "tunnel_url": tunnel_url,
             "pwa_url": pwa_url,
             "pwa_url_direct": pwa_url_direct,
             "pwa_url_hostname": pwa_url_hostname,
+            "pwa_url_tunnel": pwa_url_tunnel,
         }
 
     def ingest_bytes(

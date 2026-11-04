@@ -122,9 +122,11 @@ export interface SyncStatus {
   port: number;
   local_ip?: string;
   hostname?: string;
+  tunnel_url?: string;
   pwa_url: string;
   pwa_url_direct?: string;
   pwa_url_hostname?: string;
+  pwa_url_tunnel?: string;
   devices: SyncDevice[];
 }
 

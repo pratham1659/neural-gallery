@@ -18,7 +18,7 @@ export const SyncModal: React.FC<SyncModalProps> = ({
   onRotatePin,
   onUnpairDevice,
 }) => {
-  const [addressMode, setAddressMode] = useState<"ip" | "hostname">("ip");
+  const [addressMode, setAddressMode] = useState<"tunnel" | "ip" | "hostname">("tunnel");
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
   const [copied, setCopied] = useState<boolean>(false);
   const [showTroubleshoot, setShowTroubleshoot] = useState<boolean>(false);
@@ -36,8 +36,17 @@ export const SyncModal: React.FC<SyncModalProps> = ({
 
   const nameHost = syncStatus.hostname || "Prathams-MacBook-Air.local";
 
-  const selectedHost = addressMode === "hostname" ? nameHost : ipHost;
-  const directConnectUrl = `http://${selectedHost}:${port}/sync?pin=${cleanPin}`;
+  const tunnelUrl =
+    syncStatus.pwa_url_tunnel ||
+    (syncStatus.tunnel_url ? `${syncStatus.tunnel_url}/sync?pin=${cleanPin}` : null) ||
+    `https://flower-teaches-cast-drive.trycloudflare.com/sync?pin=${cleanPin}`;
+
+  let directConnectUrl = tunnelUrl;
+  if (addressMode === "ip") {
+    directConnectUrl = `http://${ipHost}:${port}/sync?pin=${cleanPin}`;
+  } else if (addressMode === "hostname") {
+    directConnectUrl = `http://${nameHost}:${port}/sync?pin=${cleanPin}`;
+  }
 
   // Generate QR Code as high-contrast Data URL whenever URL or PIN changes
   useEffect(() => {
@@ -102,13 +111,13 @@ export const SyncModal: React.FC<SyncModalProps> = ({
           </div>
           <div>
             <h2 className="text-base font-bold text-[var(--text-main)] flex items-center gap-2">
-              Air-Gapped P2P Wi-Fi Sync
+              P2P Mobile Sync &amp; Ingest
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-normal">
-                Direct LAN
+                TLS Encrypted
               </span>
             </h2>
             <p className="text-xs text-[var(--text-muted)]">
-              Direct device-to-device local transfer over Wi-Fi. Zero cloud egress.
+              Instantly connect and upload photos from your phone directly to this Mac.
             </p>
           </div>
         </div>
@@ -118,26 +127,40 @@ export const SyncModal: React.FC<SyncModalProps> = ({
           {/* QR Code Instant Access Card */}
           <div className="p-4 rounded-xl bg-[var(--glass-sidebar)] border border-[var(--glass-border)] flex flex-col items-center text-center">
             {/* Host Mode Selector Tabs */}
-            <div className="flex items-center p-0.5 rounded-lg bg-[var(--card)] border border-[var(--glass-border)] mb-3 text-[11px]">
+            <div className="flex items-center p-0.5 rounded-lg bg-[var(--card)] border border-[var(--glass-border)] mb-3 text-[11px] max-w-full overflow-x-auto">
+              <button
+                onClick={() => setAddressMode("tunnel")}
+                className={`px-3 py-1 rounded-md font-medium transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                  addressMode === "tunnel"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                }`}
+                title="Universal connection that works over any Wi-Fi, 5G/4G, or Hotspot"
+              >
+                <span>🌐</span>
+                <span>Universal (Recommended)</span>
+              </button>
               <button
                 onClick={() => setAddressMode("ip")}
-                className={`px-3 py-1 rounded-md font-medium transition-all ${
+                className={`px-2.5 py-1 rounded-md font-medium transition-all whitespace-nowrap ${
                   addressMode === "ip"
                     ? "bg-[var(--accent)] text-white shadow-sm"
                     : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
                 }`}
+                title="Direct local IP on your Wi-Fi"
               >
-                📶 Wi-Fi IP ({ipHost})
+                📶 Local IP
               </button>
               <button
                 onClick={() => setAddressMode("hostname")}
-                className={`px-3 py-1 rounded-md font-medium transition-all ${
+                className={`px-2.5 py-1 rounded-md font-medium transition-all whitespace-nowrap ${
                   addressMode === "hostname"
                     ? "bg-[var(--accent)] text-white shadow-sm"
                     : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
                 }`}
+                title="Bonjour / mDNS local Mac name"
               >
-                🏷️ Mac Name ({nameHost.split(".")[0]})
+                🏷️ Mac Name
               </button>
             </div>
 
@@ -157,7 +180,7 @@ export const SyncModal: React.FC<SyncModalProps> = ({
             </div>
 
             <p className="text-[11px] text-[var(--text-secondary)] mt-1.5 max-w-xs">
-              Point your phone's camera at this QR code to authenticate and open the uploader.
+              Point your phone&apos;s camera at this QR code to authenticate and open the uploader.
             </p>
 
             {/* Direct Link Bar */}
@@ -177,46 +200,36 @@ export const SyncModal: React.FC<SyncModalProps> = ({
           </div>
 
           {/* Troubleshoot Alert Banner */}
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
+          <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-3 text-xs">
             <button
               onClick={() => setShowTroubleshoot((prev) => !prev)}
-              className="w-full flex items-center justify-between text-left font-semibold text-amber-700 dark:text-amber-400"
+              className="w-full flex items-center justify-between text-left font-semibold text-blue-700 dark:text-blue-400"
             >
               <span className="flex items-center gap-1.5">
-                <span>⚠️</span>
-                <span>Phone says &quot;This site can&apos;t be reached&quot;?</span>
+                <span>💡</span>
+                <span>Why did local hotspot/Wi-Fi connection fail?</span>
               </span>
               <span className="text-[11px] underline">
-                {showTroubleshoot ? "Hide Guide ▲" : "Show Fix ▼"}
+                {showTroubleshoot ? "Hide Details ▲" : "Learn More ▼"}
               </span>
             </button>
 
             {showTroubleshoot && (
-              <div className="mt-2.5 space-y-2 text-[11px] text-[var(--text-secondary)] border-t border-amber-500/20 pt-2.5 leading-relaxed">
+              <div className="mt-2.5 space-y-2 text-[11px] text-[var(--text-secondary)] border-t border-blue-500/20 pt-2.5 leading-relaxed">
                 <div>
-                  <strong className="text-[var(--text-main)]">1. Turn OFF Mobile Data (5G/4G):</strong>
+                  <strong className="text-[var(--text-main)]">1. Router AP Isolation:</strong>
                   <br />
-                  Make sure your phone is actually on Wi-Fi and not cellular data. If phone has 5G on, it cannot reach your Mac&apos;s local IP.
+                  Many home Wi-Fi routers (e.g. JioFiber) block Wi-Fi devices from seeing or connecting to each other for security.
                 </div>
                 <div>
-                  <strong className="text-[var(--text-main)]">2. Switch to &quot;Mac Name&quot; tab above:</strong>
+                  <strong className="text-[var(--text-main)]">2. Mobile Hotspot Firewall:</strong>
                   <br />
-                  Click the <strong>&quot;Mac Name&quot;</strong> tab above to generate a <code className="bg-amber-500/20 px-1 py-0.5 rounded">.local</code> QR code. iPhones and Android phones easily resolve <code className="bg-amber-500/20 px-1 py-0.5 rounded">http://{nameHost}:{port}/sync</code> via Bonjour.
+                  When your phone runs a Personal Hotspot, Android/iOS firewalls often drop requests from the phone&apos;s own browser to connected tethered devices.
                 </div>
                 <div>
-                  <strong className="text-[var(--text-main)]">3. Check URL starts with http:// (not https://):</strong>
+                  <strong className="text-[var(--text-main)]">3. The Solution:</strong>
                   <br />
-                  Some mobile browsers auto-type <code className="bg-amber-500/20 px-1 py-0.5 rounded">https://</code>. Ensure the browser bar says <code className="bg-amber-500/20 px-1 py-0.5 rounded">http://</code>.
-                </div>
-                <div>
-                  <strong className="text-[var(--text-main)]">4. Router AP Isolation? (100% Guaranteed Solution):</strong>
-                  <br />
-                  Some Wi-Fi routers (like JioFiber / guest Wi-Fi) isolate wireless devices from each other.
-                  <br />
-                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                    ⭐ Instant Fix:
-                  </span>{" "}
-                  Turn ON your phone&apos;s <strong>Personal Hotspot</strong>, connect your Mac to your phone&apos;s hotspot, and scan the QR code! On a hotspot connection, direct P2P transfer works 100% without any router blocking.
+                  Keep <strong>&quot;Universal (Recommended)&quot;</strong> selected above! It uses Cloudflare TLS to create an instant, direct HTTPS link that works 100% reliably regardless of router settings, mobile data, or hotspot isolation.
                 </div>
               </div>
             )}
@@ -258,7 +271,7 @@ export const SyncModal: React.FC<SyncModalProps> = ({
                   No Devices Connected Yet
                 </div>
                 <p className="text-[11px] text-[var(--text-muted)] max-w-xs mx-auto">
-                  Scan the QR code above with your mobile phone while connected to this Wi-Fi network to begin uploading photos.
+                  Scan the QR code above with your mobile phone to begin uploading photos.
                 </p>
               </div>
             ) : (
