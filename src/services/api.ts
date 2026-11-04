@@ -191,28 +191,15 @@ export const api = {
       return {
         status: "ready",
         service_name: "_photovault._tcp.local.",
-        vault_id: "vault-offline-sample",
+        vault_id: "vault-offline",
         sas_pin: "849 201",
         tls_version: "TLS 1.3",
         mesh_active: true,
         port: 8765,
+        local_ip: "127.0.0.1",
         pwa_url: "http://127.0.0.1:8765/sync",
-        devices: [
-          {
-            id: "dev-iphone-16",
-            name: "Pratham's iPhone 16 Pro",
-            model: "iPhone17,1",
-            state: "paired",
-            last_sync: "Just now",
-          },
-          {
-            id: "dev-pixel-9",
-            name: "Pixel 9 Pro XL",
-            model: "Pixel 9 Pro",
-            state: "nearby",
-            last_sync: "Yesterday",
-          },
-        ],
+        pwa_url_direct: "http://127.0.0.1:8765/sync?pin=849201",
+        devices: [], // Guardrail: Zero mock devices
       };
     }
   },
@@ -224,6 +211,18 @@ export const api = {
         body: JSON.stringify({ pin, name }),
       });
       return Boolean(res.success || res.paired);
+    } catch {
+      return false;
+    }
+  },
+
+  async unpairDevice(deviceId: string): Promise<boolean> {
+    try {
+      const res = await jsonRequest<{ success?: boolean }>("/api/sync/unpair", {
+        method: "POST",
+        body: JSON.stringify({ device_id: deviceId }),
+      });
+      return Boolean(res.success);
     } catch {
       return false;
     }

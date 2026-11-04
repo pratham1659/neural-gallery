@@ -120,6 +120,8 @@ export interface SyncStatus {
   tls_version: string;
   mesh_active: boolean;
   port: number;
+  local_ip?: string;
   pwa_url: string;
+  pwa_url_direct?: string;
   devices: SyncDevice[];
 }

@@ -1053,8 +1053,8 @@ def map_pins(connection) -> list[dict]:
     ]
 
 
-def sync_status() -> dict:
-    return get_sync_engine().get_status()
+def sync_status(port: int = 8765) -> dict:
+    return get_sync_engine().get_status(port=port)
 
 
 def make_handler(db_path: Path):
@@ -1181,7 +1181,7 @@ def make_handler(db_path: Path):
                 self._json(200, candidates)
                 return
             if parsed.path == "/api/sync/status":
-                self._json(200, sync_status())
+                self._json(200, sync_status(port=self.server.server_address[1]))
                 return
             if parsed.path == "/api/search":
                 query = parse_qs(parsed.query)

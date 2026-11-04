@@ -205,8 +205,34 @@ export const App: React.FC = () => {
 
   const handleRotatePin = async () => {
     const newPin = await api.rotatePin();
-    setSyncStatus((prev) => ({ ...prev, sas_pin: newPin }));
+    setSyncStatus((prev) => ({
+      ...prev,
+      sas_pin: newPin,
+      pwa_url_direct: `http://${prev.local_ip || "127.0.0.1"}:${prev.port || 8765}/sync?pin=${newPin.replace(/\s+/g, "")}`,
+    }));
   };
+
+  const handleUnpairDevice = async (deviceId: string) => {
+    await api.unpairDevice(deviceId);
+    const newSync = await api.getSyncStatus();
+    setSyncStatus(newSync);
+  };
+
+  // Live polling for newly connected mobile devices when sync modal is open
+  useEffect(() => {
+    if (!isSyncOpen) return;
+    // Initial refresh on open
+    api.getSyncStatus().then(setSyncStatus).catch(() => {});
+    const interval = setInterval(async () => {
+      try {
+        const newSync = await api.getSyncStatus();
+        setSyncStatus(newSync);
+      } catch {
+        // ignore
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [isSyncOpen]);
 
   const handleConfirmCandidate = async (face_id: number, person_key: string) => {
     await api.confirmCandidate(face_id, person_key);
@@ -305,6 +331,7 @@ export const App: React.FC = () => {
         syncStatus={syncStatus}
         onRotatePin={handleRotatePin}
         onPairPin={(pin) => api.pairDevice(pin)}
+        onUnpairDevice={handleUnpairDevice}
       />
 
       <LockScreenModal

@@ -21,27 +21,31 @@ class PeerDevice:
     ip: str = "127.0.0.1"
 
 
+def get_local_ip() -> str:
+    """Detect the active Wi-Fi / LAN IPv4 address for local network peer discovery."""
+    import socket
+
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0.2)
+        s.connect(("10.255.255.255", 1))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        try:
+            return socket.gethostbyname(socket.gethostname())
+        except Exception:
+            return "127.0.0.1"
+
+
 class SyncEngine:
     """Zero-Cloud Air-Gapped Peer-to-Peer Wi-Fi Ingestion & Mesh Engine."""
 
     def __init__(self, vault_id: str | None = None):
         self.vault_id = vault_id or str(uuid.uuid4())
-        self._devices: dict[str, PeerDevice] = {
-            "dev-iphone-16": PeerDevice(
-                id="dev-iphone-16",
-                name="Pratham's iPhone 16 Pro",
-                model="iPhone17,1",
-                state="paired",
-                last_sync="Just now",
-            ),
-            "dev-pixel-9": PeerDevice(
-                id="dev-pixel-9",
-                name="Pixel 9 Pro XL",
-                model="Pixel 9 Pro",
-                state="nearby",
-                last_sync="Yesterday",
-            ),
-        }
+        # Clean guardrail: Start with zero mock/demo devices. Only real paired devices are recorded.
+        self._devices: dict[str, PeerDevice] = {}
         self._sas_pin: str = "849 201"
         self._pin_created_at: float = time.time()
         self._cert_fingerprint: str = hashlib.sha256(self.vault_id.encode()).hexdigest()[:16]
@@ -99,12 +103,16 @@ class SyncEngine:
     def unpair_device(self, device_id: str) -> bool:
         """Remove or unpair a device from the sync mesh."""
         if device_id in self._devices:
-            self._devices[device_id].state = "nearby"
+            del self._devices[device_id]
             return True
         return False
 
-    def get_status(self, host: str = "127.0.0.1", port: int = 8765) -> dict[str, Any]:
+    def get_status(self, host: str | None = None, port: int = 8765) -> dict[str, Any]:
         """Return full peer-to-peer sync status for UI and Bonjour advertising."""
+        local_ip = host if host and host not in ("0.0.0.0", "127.0.0.1") else get_local_ip()
+        clean_pin = self._sas_pin.replace(" ", "").strip()
+        pwa_url = f"http://{local_ip}:{port}/sync"
+        pwa_url_direct = f"http://{local_ip}:{port}/sync?pin={clean_pin}"
         return {
             "status": "ready",
             "service_name": "_photovault._tcp.local.",
@@ -115,7 +123,9 @@ class SyncEngine:
             "tls_version": "TLS 1.3",
             "mesh_active": True,
             "port": port,
-            "pwa_url": f"http://{host}:{port}/sync",
+            "local_ip": local_ip,
+            "pwa_url": pwa_url,
+            "pwa_url_direct": pwa_url_direct,
         }
 
     def ingest_bytes(
@@ -421,6 +431,20 @@ function getPin() {
   return Array.from(pinInputs).map(i => i.value).join("");
 }
 
+function getDeviceInfo() {
+  let model = "Mobile Device";
+  if (/iPhone/.test(navigator.userAgent)) model = "iPhone";
+  else if (/iPad/.test(navigator.userAgent)) model = "iPad";
+  else if (/Android/.test(navigator.userAgent)) model = "Android Phone";
+
+  let id = localStorage.getItem("neural_gallery_device_id");
+  if (!id) {
+    id = "dev-" + Math.random().toString(36).substring(2, 10);
+    localStorage.setItem("neural_gallery_device_id", id);
+  }
+  return { id, name: model, model };
+}
+
 btnPair.addEventListener("click", async () => {
   const pin = getPin();
   if (pin.length !== 6) {
@@ -430,10 +454,11 @@ btnPair.addEventListener("click", async () => {
   btnPair.disabled = true;
   btnPair.textContent = "Verifying...";
   try {
+    const dev = getDeviceInfo();
     const res = await fetch("/api/sync/pair", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pin, name: navigator.userAgent.includes("iPhone") ? "iPhone" : "Mobile Phone" })
+      body: JSON.stringify({ pin, device_id: dev.id, name: dev.name, model: dev.model })
     });
     const data = await res.json();
     if (data.success || data.paired) {
@@ -450,6 +475,18 @@ btnPair.addEventListener("click", async () => {
     btnPair.textContent = "Pair With Mac";
   }
 });
+
+// Auto-pair seamlessly if opened via QR Code scan with ?pin= parameter
+const urlParams = new URLSearchParams(window.location.search);
+const autoPin = (urlParams.get("pin") || "").replace(/\s+/g, "").trim();
+if (autoPin.length === 6) {
+  autoPin.split("").forEach((digit, idx) => {
+    if (pinInputs[idx]) pinInputs[idx].value = digit;
+  });
+  setTimeout(() => {
+    btnPair.click();
+  }, 150);
+}
 
 dropZone.addEventListener("click", () => fileInput.click());
 
