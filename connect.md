@@ -35,18 +35,20 @@ This guide lists **all available connection methods**, their requirements, and s
 ## Method 1: Universal Tunnel (Recommended)
 
 > **Why this is recommended:** Bypasses router AP isolation, cellular carrier firewalls, and guest network restrictions. Works on any Wi-Fi or mobile data network (4G/5G).
+>
+> 🔒 **Privacy & Air-Gap Control:** Includes an instant **ON/OFF switch** right in the modal. When switched OFF, the background Cloudflare tunnel is completely terminated, ensuring 0% internet egress.
+>
+> 🛡️ **Anti-Hack Dynamic OTP:** While waiting for a device to connect, the 6-digit security OTP automatically expires and rotates every 60 seconds with a countdown timer, preventing old links or brute-force attempts from gaining access.
 
 ### Steps:
 1. Open Neural Gallery on your Mac: [http://127.0.0.1:8765](http://127.0.0.1:8765).
 2. Click the **P2P Mobile Sync** button (top right header icon 📡).
-3. Select the **🌐 Universal (Recommended)** tab.
-4. Open the camera or QR code scanner on your phone (iPhone Camera or Android Google Lens/Camera).
-5. Point your camera at the QR code and tap the link banner:
-   ```text
-   https://flower-teaches-cast-drive.trycloudflare.com/sync?pin=849201
-   ```
-6. The phone automatically validates the SAS PIN and opens the mobile photo upload interface.
+3. Select the **🌐 Universal** tab.
+4. If the tunnel is currently OFF, toggle the switch to **ON**.
+5. Open your phone camera or QR code scanner and scan the QR code.
+6. The phone automatically validates the dynamic SAS PIN and opens the mobile photo upload interface.
 7. Tap **"Select Photos to Ingest"**, choose your photos, and watch them stream directly into your Mac's `~/Pictures/Neural Gallery Imports` folder.
+8. Once finished, toggle the switch to **OFF** anytime for complete air-gapped isolation!
 
 ---
 
