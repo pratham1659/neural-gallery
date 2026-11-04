@@ -1600,6 +1600,7 @@ def make_handler(db_path: Path):
                     if not isinstance(folder_id, int):
                         self._json(400, {"error": "valid folder id is required"})
                         return
+                    connection.execute("DELETE FROM shared_album_files WHERE album_id = ?", (folder_id,))
                     connection.execute("DELETE FROM shared_albums WHERE id = ?", (folder_id,))
                     connection.commit()
                     self._json(200, {"success": True, "id": folder_id})

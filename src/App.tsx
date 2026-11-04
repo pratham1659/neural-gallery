@@ -112,6 +112,7 @@ export const App: React.FC = () => {
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<number>>(new Set());
   const [undoToast, setUndoToast] = useState<{ message: string; ids: number[] } | null>(null);
   const [isEmptyTrashConfirmOpen, setIsEmptyTrashConfirmOpen] = useState(false);
+  const [folderToDelete, setFolderToDelete] = useState<FolderItem | null>(null);
 
   // Load Initial Data
   const refreshData = async () => {
@@ -466,10 +467,16 @@ export const App: React.FC = () => {
   };
 
   const handleDeleteFolder = async (id: number) => {
-    await api.deleteFolder(id);
-    setFolders((prev) => prev.filter((f) => f.id !== id));
-    if (currentCategory === `folder:${id}`) {
-      setCurrentCategory("all");
+    try {
+      await api.deleteFolder(id);
+      setFolders((prev) => prev.filter((f) => f.id !== id));
+      if (currentCategory === `folder:${id}`) {
+        setCurrentCategory("all");
+      }
+      // Refresh to ensure all merged photos are immediately active in the library
+      await refreshData();
+    } catch (err) {
+      console.error("Failed to delete folder:", err);
     }
   };
 
@@ -821,7 +828,7 @@ export const App: React.FC = () => {
             }}
             folders={folders}
             onCreateFolder={handleCreateFolder}
-            onDeleteFolder={handleDeleteFolder}
+            onDeleteFolder={(folder) => setFolderToDelete(folder)}
             onDropOnFolder={handleDropOnFolder}
             onDropOnCategory={handleDropOnCategory}
           />
@@ -980,6 +987,45 @@ export const App: React.FC = () => {
                 className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-md transition-all"
               >
                 Empty Bin
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Folder & Merge Photos Confirmation Modal */}
+      {folderToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm select-none animate-fadeIn">
+          <div className="w-full max-w-sm rounded-2xl bg-[var(--glass-card)] border border-[var(--glass-border)] shadow-2xl p-6 text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center text-2xl mx-auto">
+              📁
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-[var(--text-main)]">
+                Delete Folder &amp; Merge Photos?
+              </h3>
+              <p className="text-xs text-[var(--text-muted)] mt-1.5 leading-relaxed">
+                Delete folder <span className="font-semibold text-[var(--text-main)]">"{folderToDelete.name}"</span>?
+                <br />
+                All <span className="font-semibold text-[var(--text-main)]">{folderToDelete.count}</span> photos in this folder will remain completely safe and be merged into your main photo library.
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <button
+                onClick={() => setFolderToDelete(null)}
+                className="px-4 py-2 rounded-xl bg-[var(--button-bg)] border border-[var(--button-border)] hover:bg-[var(--button-hover)] text-xs font-semibold text-[var(--text-main)] transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  const id = folderToDelete.id;
+                  setFolderToDelete(null);
+                  await handleDeleteFolder(id);
+                }}
+                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-md transition-all flex items-center gap-1.5"
+              >
+                <span>Delete &amp; Merge Photos</span>
               </button>
             </div>
           </div>

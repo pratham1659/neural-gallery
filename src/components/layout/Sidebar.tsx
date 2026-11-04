@@ -11,7 +11,7 @@ interface SidebarProps {
   onOpenSync: () => void;
   folders?: FolderItem[];
   onCreateFolder?: (name: string) => Promise<void>;
-  onDeleteFolder?: (id: number) => Promise<void>;
+  onDeleteFolder?: (folder: FolderItem) => void;
   onDropOnFolder?: (folderId: number, photoIds: number[]) => Promise<void>;
   onDropOnCategory?: (category: string, photoIds: number[]) => Promise<void>;
 }
@@ -409,12 +409,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (confirm(`Delete folder "${folder.name}"? Photos will remain in your catalog.`)) {
-                            onDeleteFolder(folder.id);
-                          }
+                          onDeleteFolder(folder);
                         }}
                         className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-[var(--text-muted)] hover:text-rose-500 transition-opacity"
-                        title="Delete folder"
+                        title={`Delete folder "${folder.name}"`}
                       >
                         <Trash2 size={12} />
                       </button>
