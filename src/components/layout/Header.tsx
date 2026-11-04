@@ -33,7 +33,6 @@ interface HeaderProps {
   onLockVault: () => void;
   theme: ThemeMode;
   onToggleTheme: () => void;
-  onEnlargePhoto?: () => void;
   hasSelectedPhoto?: boolean;
   selectedCount?: number;
   totalCount?: number;
@@ -65,7 +64,6 @@ export const Header: React.FC<HeaderProps> = ({
   onLockVault,
   theme,
   onToggleTheme,
-  onEnlargePhoto,
   hasSelectedPhoto,
   selectedCount = 0,
   totalCount = 0,

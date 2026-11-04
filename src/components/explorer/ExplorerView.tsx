@@ -118,17 +118,6 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Open Enlarged Button */}
-            <button
-              onClick={() => onEnlargePhoto(selectedPhoto)}
-              className="px-3 py-1 rounded-lg bg-[var(--button-bg)] border border-[var(--button-border)] text-xs font-semibold hover:bg-[var(--button-hover)] text-[var(--text-main)] flex items-center gap-1.5 shadow-sm transition-all"
-              title="Open photo enlarged (Space / Double-click)"
-            >
-              <Maximize2 size={13} className="text-blue-500" />
-              <span>Enlarge</span>
-              <span className="text-[10px] opacity-75 font-mono">Space</span>
-            </button>
-
             {/* If in Trash: Show Put Back button */}
             {isTrashCategory || selectedPhoto.is_trashed ? (
               onRestorePhoto && (

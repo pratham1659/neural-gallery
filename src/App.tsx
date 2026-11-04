@@ -770,7 +770,6 @@ export const App: React.FC = () => {
         onLockVault={handleLockVault}
         theme={theme}
         onToggleTheme={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
-        onEnlargePhoto={() => selectedPhoto && setIsEnlargedOpen(true)}
         hasSelectedPhoto={!!selectedPhoto}
         selectedCount={selectedPhotoIds.size}
         totalCount={photos.length}
