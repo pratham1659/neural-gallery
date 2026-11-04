@@ -1057,6 +1057,44 @@ def sync_status(port: int = 8765) -> dict:
     return get_sync_engine().get_status(port=port)
 
 
+def choose_folder_dialog(prompt: str = "Select a photo folder to index in Neural Gallery") -> str | None:
+    """Prompt the user with native macOS Finder Open panel via AppleScript."""
+    import subprocess
+    try:
+        script = f'POSIX path of (choose folder with prompt "{prompt}")'
+        res = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=120)
+        if res.returncode == 0:
+            folder = res.stdout.strip().rstrip("/")
+            if folder and Path(folder).is_dir():
+                return folder
+    except Exception:
+        pass
+    return None
+
+
+def folder_presets() -> list[dict]:
+    """Common macOS photo directories for quick one-click indexing."""
+    home = Path.home()
+    presets = [
+        {"name": "Pictures", "path": str(home / "Pictures"), "icon": "📸", "exists": (home / "Pictures").is_dir()},
+        {"name": "Downloads", "path": str(home / "Downloads"), "icon": "📥", "exists": (home / "Downloads").is_dir()},
+        {"name": "Desktop", "path": str(home / "Desktop"), "icon": "🖥️", "exists": (home / "Desktop").is_dir()},
+        {"name": "Documents", "path": str(home / "Documents"), "icon": "📄", "exists": (home / "Documents").is_dir()},
+        {"name": "Home Folder", "path": str(home), "icon": "🏠", "exists": True},
+    ]
+    volumes = Path("/Volumes")
+    if volumes.is_dir():
+        for vol in volumes.iterdir():
+            if vol.is_dir() and vol.name not in ("Macintosh HD", "Macintosh HD - Data"):
+                presets.append({
+                    "name": f"Volume: {vol.name}",
+                    "path": str(vol),
+                    "icon": "💾",
+                    "exists": True
+                })
+    return presets
+
+
 def make_handler(db_path: Path):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, fmt: str, *args) -> None:
@@ -1124,6 +1162,9 @@ def make_handler(db_path: Path):
                     self._json(200, _stats(connection))
                 finally:
                     connection.close()
+                return
+            if parsed.path == "/api/folders/presets":
+                self._json(200, folder_presets())
                 return
             if parsed.path == "/api/photos":
                 query = parse_qs(parsed.query)
@@ -1362,6 +1403,14 @@ def make_handler(db_path: Path):
                     self._json(400, {"error": "that folder does not exist"})
                     return
                 self._json(200, summary)
+                return
+
+            if parsed.path == "/api/folders/choose":
+                folder = choose_folder_dialog()
+                if folder:
+                    self._json(200, {"folder": folder, "success": True})
+                else:
+                    self._json(200, {"folder": None, "canceled": True})
                 return
 
             valid_post_paths = {

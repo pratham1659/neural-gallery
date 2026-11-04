@@ -125,3 +125,19 @@ export interface SyncStatus {
   pwa_url_direct?: string;
   devices: SyncDevice[];
 }
+
+export interface FolderPreset {
+  name: string;
+  path: string;
+  icon: string;
+  exists: boolean;
+}
+
+export interface ScanSummary {
+  seen: number;
+  added: number;
+  updated: number;
+  unchanged: number;
+  unreadable: number;
+  duplicate_groups: number;
+}

@@ -240,8 +240,42 @@ export const api = {
     }
   },
 
-  async indexFolder(folder: string): Promise<any> {
-    return jsonRequest("/api/scan", {
+  async getFolderPresets(): Promise<import("../types/gallery").FolderPreset[]> {
+    try {
+      return await jsonRequest<import("../types/gallery").FolderPreset[]>("/api/folders/presets");
+    } catch {
+      return [
+        { name: "Pictures", path: "~/Pictures", icon: "📸", exists: true },
+        { name: "Downloads", path: "~/Downloads", icon: "📥", exists: true },
+        { name: "Desktop", path: "~/Desktop", icon: "🖥️", exists: true },
+      ];
+    }
+  },
+
+  async chooseFolder(): Promise<string | null> {
+    // 1. PyWebView desktop API check if present
+    if (typeof window !== "undefined" && (window as any).pywebview?.api?.choose_folder) {
+      try {
+        const path = await (window as any).pywebview.api.choose_folder();
+        if (path) return path;
+      } catch (err) {
+        console.warn("PyWebView choose_folder failed:", err);
+      }
+    }
+
+    // 2. Call backend native macOS folder dialog endpoint
+    try {
+      const res = await jsonRequest<{ folder: string | null; success?: boolean; canceled?: boolean }>("/api/folders/choose", {
+        method: "POST",
+      });
+      return res.folder || null;
+    } catch {
+      return null;
+    }
+  },
+
+  async indexFolder(folder: string): Promise<import("../types/gallery").ScanSummary> {
+    return jsonRequest<import("../types/gallery").ScanSummary>("/api/scan", {
       method: "POST",
       body: JSON.stringify({ folder }),
     });

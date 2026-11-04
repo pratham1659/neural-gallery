@@ -20,6 +20,7 @@ import { PeopleView } from "./components/people/PeopleView";
 import { InspectorSidebar } from "./components/inspector/InspectorSidebar";
 import { SyncModal } from "./components/sync/SyncModal";
 import { LockScreenModal } from "./components/auth/LockScreenModal";
+import { IndexFolderModal } from "./components/dialogs/IndexFolderModal";
 
 export const App: React.FC = () => {
   // Navigation & View State
@@ -71,6 +72,7 @@ export const App: React.FC = () => {
   const [isInspectorOpen, setIsInspectorOpen] = useState(true);
   const [isSyncOpen, setIsSyncOpen] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
+  const [isIndexFolderOpen, setIsIndexFolderOpen] = useState(false);
 
   // Load Initial Data
   const refreshData = async () => {
@@ -191,16 +193,8 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleIndexFolder = async () => {
-    const folder = prompt("Enter full folder path to index on this Mac:", "~/Pictures");
-    if (folder) {
-      try {
-        await api.indexFolder(folder);
-        refreshData();
-      } catch (err) {
-        alert("Could not index folder: " + err);
-      }
-    }
+  const handleIndexFolder = () => {
+    setIsIndexFolderOpen(true);
   };
 
   const handleRotatePin = async () => {
@@ -325,6 +319,12 @@ export const App: React.FC = () => {
       </div>
 
       {/* Modals */}
+      <IndexFolderModal
+        isOpen={isIndexFolderOpen}
+        onClose={() => setIsIndexFolderOpen(false)}
+        onIndexComplete={refreshData}
+      />
+
       <SyncModal
         isOpen={isSyncOpen}
         onClose={() => setIsSyncOpen(false)}
