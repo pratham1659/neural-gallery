@@ -478,7 +478,7 @@ btnPair.addEventListener("click", async () => {
     const dev = getDeviceInfo();
     const res = await fetch("/api/sync/pair", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Neural-Gallery": "1" },
       body: JSON.stringify({ pin, device_id: dev.id, name: dev.name, model: dev.model })
     });
     const data = await res.json();

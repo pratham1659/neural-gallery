@@ -1097,8 +1097,10 @@ def folder_presets() -> list[dict]:
 
 def make_handler(db_path: Path):
     class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
         def log_message(self, fmt: str, *args) -> None:
-            return
+            print(f"[HTTP] {self.client_address[0]}:{self.client_address[1]} - {fmt % args}", flush=True)
 
         def _send(self, status: int, body: bytes, content_type: str) -> None:
             self.send_response(status)
@@ -1106,11 +1108,31 @@ def make_handler(db_path: Path):
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
+            self.send_header("Access-Control-Allow-Headers", "*")
             self.end_headers()
-            self.wfile.write(body)
+            if not getattr(self, "_is_head", False):
+                self.wfile.write(body)
 
         def _json(self, status: int, payload) -> None:
             self._send(status, json.dumps(payload).encode(), "application/json")
+
+        def do_HEAD(self) -> None:
+            self._is_head = True
+            try:
+                self.do_GET()
+            finally:
+                self._is_head = False
+
+        def do_OPTIONS(self) -> None:
+            self.send_response(204)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
+            self.send_header("Access-Control-Allow-Headers", "*")
+            self.send_header("Access-Control-Max-Age", "86400")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
 
         def do_GET(self) -> None:
             parsed = urlparse(self.path)
