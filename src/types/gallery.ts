@@ -9,6 +9,8 @@ export interface FolderItem {
   count: number;
   created_at: number;
   is_hidden?: boolean;
+  storage_mode?: "virtual" | "physical";
+  disk_folder?: string;
 }
 
 export interface VaultStorageInfo {

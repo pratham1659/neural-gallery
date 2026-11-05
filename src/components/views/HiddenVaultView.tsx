@@ -11,7 +11,7 @@ interface HiddenVaultViewProps {
   hiddenFolders: FolderItem[];
   selectedFolderId?: number | null;
   onSelectFolder: (folderId: number | null) => void;
-  onCreateFolder: (name: string) => Promise<void>;
+  onCreateFolder: (name: string, storageMode?: "virtual" | "physical") => Promise<void>;
   onDeleteFolder: (folder: FolderItem) => void;
   onSelectPhoto: (photo: PhotoItem, e: React.MouseEvent) => void;
   onEnlargePhoto: (photo: PhotoItem) => void;

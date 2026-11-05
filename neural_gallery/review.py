@@ -2,6 +2,9 @@
 
 import json
 import os
+import re
+import shutil
+import subprocess
 import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -35,7 +38,7 @@ from neural_gallery.faces import (
     name_person,
 )
 from neural_gallery.learn import load_examples, suggest
-from neural_gallery.scan import scan_folder
+from neural_gallery.scan import VIDEO_SUFFIXES, scan_folder
 from neural_gallery.sync import MOBILE_PWA_HTML, get_sync_engine
 
 PAGE = """<!DOCTYPE html>
@@ -1143,6 +1146,87 @@ def make_handler(db_path: Path):
             if not getattr(self, "_is_head", False):
                 self.wfile.write(body)
 
+        def _send_file_stream(self, path: Path, content_type: str) -> None:
+            """Stream a media file with full HTTP Range request support (206 Partial Content)."""
+            try:
+                stat = path.stat()
+                total_size = stat.st_size
+            except OSError:
+                self._send(404, b"", "text/plain")
+                return
+
+            range_header = self.headers.get("Range")
+            if not range_header:
+                self.send_response(200)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Content-Length", str(total_size))
+                self.send_header("Accept-Ranges", "bytes")
+                self.send_header("Cache-Control", "public, max-age=3600")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+                self.send_header("Access-Control-Allow-Headers", "*")
+                self.send_header("Access-Control-Allow-Private-Network", "true")
+                self.end_headers()
+                if not getattr(self, "_is_head", False):
+                    try:
+                        with open(path, "rb") as f:
+                            shutil.copyfileobj(f, self.wfile, length=64 * 1024)
+                    except (BrokenPipeError, ConnectionResetError):
+                        pass
+                return
+
+            range_match = re.match(r"bytes=(\d*)-(\d*)", range_header)
+            if not range_match:
+                self.send_response(416)
+                self.send_header("Content-Range", f"bytes */{total_size}")
+                self.end_headers()
+                return
+
+            start_str, end_str = range_match.groups()
+            if start_str and end_str:
+                start = int(start_str)
+                end = int(end_str)
+            elif start_str:
+                start = int(start_str)
+                end = total_size - 1
+            elif end_str:
+                end = total_size - 1
+                start = max(0, total_size - int(end_str))
+            else:
+                start = 0
+                end = total_size - 1
+
+            start = max(0, min(start, total_size - 1))
+            end = max(start, min(end, total_size - 1))
+            length = end - start + 1
+
+            self.send_response(206)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Range", f"bytes {start}-{end}/{total_size}")
+            self.send_header("Content-Length", str(length))
+            self.send_header("Accept-Ranges", "bytes")
+            self.send_header("Cache-Control", "public, max-age=3600")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "*")
+            self.send_header("Access-Control-Allow-Private-Network", "true")
+            self.end_headers()
+
+            if not getattr(self, "_is_head", False):
+                try:
+                    with open(path, "rb") as f:
+                        f.seek(start)
+                        remaining = length
+                        chunk_size = 64 * 1024
+                        while remaining > 0:
+                            chunk = f.read(min(remaining, chunk_size))
+                            if not chunk:
+                                break
+                            self.wfile.write(chunk)
+                            remaining -= len(chunk)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+
         def _json(self, status: int, payload) -> None:
             self._send(status, json.dumps(payload).encode(), "application/json")
 
@@ -1384,6 +1468,22 @@ def make_handler(db_path: Path):
                 finally:
                     connection.close()
                 return
+            if parsed.path.startswith("/media/raw/"):
+                token = parsed.path.removeprefix("/media/raw/")
+                if not token.isdigit():
+                    self._send(404, b"", "text/plain")
+                    return
+                connection = connect(db_path)
+                try:
+                    path = allowed_file(connection, int(token))
+                finally:
+                    connection.close()
+                if path is None:
+                    self._send(404, b"", "text/plain")
+                    return
+                self._send_file_stream(path, _mime_for_file(path))
+                return
+
             if parsed.path.startswith("/media/"):
                 token = parsed.path.removeprefix("/media/")
                 if not token.isdigit():
@@ -1397,8 +1497,18 @@ def make_handler(db_path: Path):
                 if path is None:
                     self._send(404, b"", "text/plain")
                     return
+
+                params = parse_qs(parsed.query)
+                is_raw = bool(params.get("raw") and params.get("raw")[0] in ("1", "true"))
+                has_w = bool(params.get("w"))
+                is_vid = path.suffix.lower() in VIDEO_SUFFIXES
+
+                if is_raw or (is_vid and not has_w):
+                    self._send_file_stream(path, _mime_for_file(path))
+                    return
+
                 edge = 1600
-                asked = (parse_qs(parsed.query).get("w") or ["1600"])[0]
+                asked = (params.get("w") or ["1600"])[0]
                 if asked.isdigit():
                     edge = max(120, min(int(asked), 1600))
                 try:
@@ -1661,6 +1771,7 @@ def make_handler(db_path: Path):
                 if parsed.path == "/api/folders":
                     name = (payload.get("name") or "").strip()
                     is_hidden = 1 if payload.get("is_hidden") else 0
+                    storage_mode = (payload.get("storage_mode") or "virtual").strip().lower()
                     if not name:
                         self._json(400, {"error": "folder name is required"})
                         return
@@ -1671,7 +1782,29 @@ def make_handler(db_path: Path):
                     )
                     folder_id = cur.lastrowid
                     connection.commit()
-                    self._json(200, {"id": folder_id, "name": name, "is_hidden": bool(is_hidden), "count": 0})
+
+                    disk_folder = None
+                    if storage_mode == "physical":
+                        try:
+                            from neural_gallery.vault_storage import get_vault_config, ensure_vault_structure
+                            cfg = get_vault_config()
+                            vault_dirs = ensure_vault_structure(Path(cfg["vault_path"]))
+                            target_base = vault_dirs["originals"] / "Folders"
+                            target_base.mkdir(parents=True, exist_ok=True)
+                            disk_path = target_base / name
+                            disk_path.mkdir(parents=True, exist_ok=True)
+                            disk_folder = str(disk_path)
+                        except Exception:
+                            pass
+
+                    self._json(200, {
+                        "id": folder_id,
+                        "name": name,
+                        "is_hidden": bool(is_hidden),
+                        "count": 0,
+                        "storage_mode": storage_mode,
+                        "disk_folder": disk_folder,
+                    })
                     return
 
                 if parsed.path == "/api/folders/delete":
@@ -1898,7 +2031,61 @@ def make_handler(db_path: Path):
     return Handler
 
 
+def _mime_for_file(path: Path) -> str:
+    s = path.suffix.lower()
+    if s == ".mp4":
+        return "video/mp4"
+    if s == ".mov":
+        return "video/quicktime"
+    if s == ".webm":
+        return "video/webm"
+    if s == ".m4v":
+        return "video/x-m4v"
+    if s in (".jpg", ".jpeg"):
+        return "image/jpeg"
+    if s == ".png":
+        return "image/png"
+    if s == ".webp":
+        return "image/webp"
+    if s == ".gif":
+        return "image/gif"
+    return "application/octet-stream"
+
+
+def _video_thumbnail(path: Path, edge: int = 1600) -> bytes:
+    ffmpeg_bin = shutil.which("ffmpeg")
+    if not ffmpeg_bin:
+        for candidate in ("/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/usr/bin/ffmpeg"):
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                ffmpeg_bin = candidate
+                break
+    if ffmpeg_bin:
+        try:
+            cmd = [
+                ffmpeg_bin, "-ss", "0.5", "-i", str(path),
+                "-vframes", "1", "-f", "image2pipe", "-vcodec", "mjpeg", "-"
+            ]
+            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=4)
+            if proc.returncode == 0 and proc.stdout:
+                with Image.open(BytesIO(proc.stdout)) as image:
+                    image = image.convert("RGB")
+                    image.thumbnail((edge, edge))
+                    buf = BytesIO()
+                    image.save(buf, format="JPEG", quality=80)
+                    return buf.getvalue()
+        except Exception:
+            pass
+
+    # Fallback placeholder video thumbnail
+    img = Image.new("RGB", (edge, int(edge * 9 / 16)), (24, 24, 27))
+    buf = BytesIO()
+    img.save(buf, format="JPEG", quality=80)
+    return buf.getvalue()
+
+
 def _thumbnail(path: Path, edge: int = 1600) -> bytes:
+    if path.suffix.lower() in VIDEO_SUFFIXES:
+        return _video_thumbnail(path, edge)
     with Image.open(path) as image:
         oriented = ImageOps.exif_transpose(image)
         if oriented is not None:

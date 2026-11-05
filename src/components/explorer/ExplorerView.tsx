@@ -132,14 +132,16 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
               )
             ) : (
               <>
-                <button
-                  onClick={() => onKeepPhoto(selectedPhoto.id)}
-                  className="px-3 py-1 rounded-lg bg-emerald-600 text-white text-xs font-semibold shadow-sm hover:bg-emerald-700 flex items-center gap-1.5 transition-all"
-                  title="Keep photo (K)"
-                >
-                  <span>✓ Keep</span>
-                  <span className="text-[10px] opacity-75 font-mono">K</span>
-                </button>
+                {selectedPhoto.is_imported && (
+                  <button
+                    onClick={() => onKeepPhoto(selectedPhoto.id)}
+                    className="px-3 py-1 rounded-lg bg-emerald-600 text-white text-xs font-semibold shadow-sm hover:bg-emerald-700 flex items-center gap-1.5 transition-all"
+                    title="Save to Library (K)"
+                  >
+                    <span>✓ Save to Library</span>
+                    <span className="text-[10px] opacity-75 font-mono">K</span>
+                  </button>
+                )}
 
                 <button
                   onClick={() => onTrashPhoto(selectedPhoto.id)}

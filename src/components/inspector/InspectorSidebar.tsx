@@ -89,10 +89,15 @@ function formatDate(timestamp?: number) {
 }
 
 function formatCoordinates(lat?: number | null, lon?: number | null) {
-  if (lat == null || lon == null || isNaN(lat) || isNaN(lon)) return null;
-  const latDir = lat >= 0 ? "N" : "S";
-  const lonDir = lon >= 0 ? "E" : "W";
-  return `${Math.abs(lat).toFixed(4)}° ${latDir}, ${Math.abs(lon).toFixed(4)}° ${lonDir}`;
+  if (lat == null || lon == null) return null;
+  const nLat = Number(lat);
+  const nLon = Number(lon);
+  if (isNaN(nLat) || isNaN(nLon) || (nLat === 0 && nLon === 0) || Math.abs(nLat) > 90 || Math.abs(nLon) > 180) {
+    return null;
+  }
+  const latDir = nLat >= 0 ? "N" : "S";
+  const lonDir = nLon >= 0 ? "E" : "W";
+  return `${Math.abs(nLat).toFixed(4)}° ${latDir}, ${Math.abs(nLon).toFixed(4)}° ${lonDir}`;
 }
 
 function formatBrand(make?: string) {
@@ -180,6 +185,14 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
   const iso = current.iso || (current.iso_equivalent ? `ISO ${current.iso_equivalent}` : "");
   const colorSpace = current.color_space || "";
   const dimensions = formatDimensions(current.width, current.height);
+  const rawLat = current.latitude != null ? Number(current.latitude) : NaN;
+  const rawLon = current.longitude != null ? Number(current.longitude) : NaN;
+  const hasValidGps =
+    !isNaN(rawLat) &&
+    !isNaN(rawLon) &&
+    Math.abs(rawLat) <= 90 &&
+    Math.abs(rawLon) <= 180 &&
+    !(rawLat === 0 && rawLon === 0);
   const coordsFormatted = formatCoordinates(current.latitude, current.longitude);
   const locationName = current.location_name || (current.city ? `${current.city}${current.country ? `, ${current.country}` : ""}` : "");
   const altitude = current.altitude != null ? `${Math.round(current.altitude)} m` : (current.altitude_meters != null ? `${Math.round(current.altitude_meters)} m` : null);
@@ -454,27 +467,40 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
             <MapPin size={13} className="text-[var(--accent)]" />
             <span>Location & Map</span>
           </div>
-          {current.latitude != null && current.longitude != null && (
-            <a
-              href={`https://maps.apple.com/?q=${current.latitude},${current.longitude}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-[10px] text-[var(--accent)] hover:underline font-medium"
-              title="Open full interactive map"
-            >
-              <span>Apple Maps</span>
-              <ExternalLink size={10} />
-            </a>
+          {hasValidGps && (
+            <div className="flex items-center gap-1.5 text-[10px]">
+              <a
+                href={`https://maps.apple.com/?q=${rawLat},${rawLon}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-0.5 text-[var(--accent)] hover:underline font-medium"
+                title="Open in Apple Maps"
+              >
+                <span>Apple Maps</span>
+                <ExternalLink size={9} />
+              </a>
+              <span className="text-[var(--text-faint)]">·</span>
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${rawLat},${rawLon}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-0.5 text-[var(--accent)] hover:underline font-medium"
+                title="Open in Google Maps"
+              >
+                <span>Google</span>
+                <ExternalLink size={9} />
+              </a>
+            </div>
           )}
         </div>
 
         {/* Small Embedded Map view */}
-        {current.latitude != null && current.longitude != null ? (
+        {hasValidGps ? (
           <div className="space-y-2">
             <div className="relative w-full h-36 rounded-xl overflow-hidden border border-[var(--glass-border)] shadow-inner bg-[var(--canvas-bg)] group">
               <iframe
                 title="Photo Location Map"
-                src={`https://www.openstreetmap.org/export/embed.html?bbox=${current.longitude - 0.008}%2C${current.latitude - 0.005}%2C${current.longitude + 0.008}%2C${current.latitude + 0.005}&layer=mapnik&marker=${current.latitude}%2C${current.longitude}`}
+                src={`https://www.openstreetmap.org/export/embed.html?bbox=${rawLon - 0.008}%2C${rawLat - 0.005}%2C${rawLon + 0.008}%2C${rawLat + 0.005}&layer=mapnik&marker=${rawLat}%2C${rawLon}`}
                 className="w-full h-full border-0 pointer-events-auto"
                 loading="lazy"
               />
@@ -510,8 +536,8 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
             <div className="text-xs font-semibold text-[var(--text-main)]">
               No Map Coordinates
             </div>
-            <div className="text-[10px] text-[var(--text-muted)] mt-0.5 max-w-[210px] leading-relaxed">
-              {locationName ? `Labeled as "${locationName}", but lacks GPS coordinates.` : "This photo does not have GPS latitude & longitude tagged in its EXIF metadata."}
+            <div className="text-[10px] text-[var(--text-muted)] mt-1 max-w-[220px] leading-relaxed">
+              {locationName ? `Labeled as "${locationName}", but lacks GPS coordinates.` : "No GPS coordinates found in EXIF. Note: WhatsApp, screenshots, and social apps remove location data before sharing."}
             </div>
           </div>
         )}

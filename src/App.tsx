@@ -628,15 +628,15 @@ export const App: React.FC = () => {
     }
   };
 
-  // Folder Handlers (keep photos separate)
-  const handleCreateFolder = async (name: string) => {
-    const created = await api.createFolder(name, false);
+  // Folder Handlers (keep photos separate or virtual collection)
+  const handleCreateFolder = async (name: string, storageMode: "virtual" | "physical" = "virtual") => {
+    const created = await api.createFolder(name, false, storageMode);
     setFolders((prev) => [...prev, created]);
     setCurrentCategory(`folder:${created.id}`);
   };
 
-  const handleCreateHiddenFolder = async (name: string) => {
-    const created = await api.createFolder(name, true);
+  const handleCreateHiddenFolder = async (name: string, storageMode: "virtual" | "physical" = "virtual") => {
+    const created = await api.createFolder(name, true, storageMode);
     setFolders((prev) => [...prev, created]);
     setCurrentCategory(`folder:${created.id}`);
     await refreshData();

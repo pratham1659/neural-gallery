@@ -15,6 +15,8 @@ import {
   RotateCcw,
   RotateCw,
   Smartphone,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 
 interface EnlargedPhotoModalProps {
@@ -41,17 +43,56 @@ export const EnlargedPhotoModal: React.FC<EnlargedPhotoModalProps> = ({
   onRestorePhoto,
 }) => {
   const [showInfo, setShowInfo] = useState(false);
-  const [isZoomed, setIsZoomed] = useState(false);
+  const [zoomScale, setZoomScale] = useState<number>(1.0);
+  const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const dragStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const panStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
   const [imageLoaded, setImageLoaded] = useState(false);
   const [rotation, setRotation] = useState<number>(0);
   const thumbnailStripRef = useRef<HTMLDivElement>(null);
 
-  // Reset image view and show naturally: portrait as portrait, landscape as landscape
+  // Check if current item is a video file
+  const isVideo = Boolean(
+    photo?.is_video ||
+    (photo?.original_extension && ["mp4", "mov", "m4v", "webm", "mkv", "avi"].includes(photo.original_extension.toLowerCase())) ||
+    (photo?.file_name && /\.(mp4|mov|m4v|webm|mkv|avi)$/i.test(photo.file_name))
+  );
+
+  // Reset image view and zoom whenever photo changes
   useEffect(() => {
     setImageLoaded(false);
-    setIsZoomed(false);
-    // Keep true orientation by default: landscape as landscape, portrait as portrait
+    setZoomScale(1.0);
+    setPanOffset({ x: 0, y: 0 });
     setRotation(0);
+  }, [photo?.id]);
+
+  // Non-passive wheel event listener to capture trackpad pinch-in/pinch-out gestures
+  useEffect(() => {
+    const el = canvasContainerRef.current;
+    if (!el) return;
+
+    const onWheel = (e: WheelEvent) => {
+      // Pinch gesture on macOS trackpads emits ctrlKey: true
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        const zoomFactor = Math.exp(-e.deltaY * 0.015);
+        setZoomScale((prev) => {
+          const next = Math.min(5.0, Math.max(0.6, prev * zoomFactor));
+          if (next <= 1.05 && prev > 1.05) {
+            setPanOffset({ x: 0, y: 0 });
+          }
+          return Number(next.toFixed(3));
+        });
+      }
+    };
+
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
   }, [photo?.id]);
 
   const handleRotate = () => {
@@ -59,22 +100,54 @@ export const EnlargedPhotoModal: React.FC<EnlargedPhotoModalProps> = ({
   };
 
   const handleAutoRotate = () => {
-    // Toggle 90° rotation if user wishes to rotate between orientations
     setRotation((prev) => (prev === 0 ? 90 : 0));
+  };
+
+  const handleToggleZoom = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (zoomScale > 1.1) {
+      setZoomScale(1.0);
+      setPanOffset({ x: 0, y: 0 });
+    } else {
+      setZoomScale(2.5);
+    }
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (zoomScale <= 1.05) return;
+    e.preventDefault();
+    setIsDragging(true);
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+    panStartRef.current = { ...panOffset };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || zoomScale <= 1.05) return;
+    const dx = e.clientX - dragStartRef.current.x;
+    const dy = e.clientY - dragStartRef.current.y;
+    setPanOffset({
+      x: panStartRef.current.x + dx,
+      y: panStartRef.current.y + dy,
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
   };
 
   // Current index in photos array
   const currentIndex = photo ? photos.findIndex((p) => p.id === photo.id) : -1;
   const hasPhotos = photos.length > 0;
-  const canGoPrev = hasPhotos && (photos.length > 1);
-  const canGoNext = hasPhotos && (photos.length > 1);
+  const canGoPrev = hasPhotos && photos.length > 1;
+  const canGoNext = hasPhotos && photos.length > 1;
 
   // Navigation handlers
   const handlePrev = () => {
     if (!hasPhotos || currentIndex === -1) return;
     const prevIndex = currentIndex > 0 ? currentIndex - 1 : photos.length - 1;
     setImageLoaded(false);
-    setIsZoomed(false);
+    setZoomScale(1.0);
+    setPanOffset({ x: 0, y: 0 });
     onSelectPhoto(photos[prevIndex]);
   };
 
@@ -82,7 +155,8 @@ export const EnlargedPhotoModal: React.FC<EnlargedPhotoModalProps> = ({
     if (!hasPhotos || currentIndex === -1) return;
     const nextIndex = currentIndex < photos.length - 1 ? currentIndex + 1 : 0;
     setImageLoaded(false);
-    setIsZoomed(false);
+    setZoomScale(1.0);
+    setPanOffset({ x: 0, y: 0 });
     onSelectPhoto(photos[nextIndex]);
   };
 
@@ -91,7 +165,6 @@ export const EnlargedPhotoModal: React.FC<EnlargedPhotoModalProps> = ({
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't capture when editing text inputs
       if (
         document.activeElement?.tagName === "INPUT" ||
         document.activeElement?.tagName === "TEXTAREA"
@@ -115,7 +188,7 @@ export const EnlargedPhotoModal: React.FC<EnlargedPhotoModalProps> = ({
         e.preventDefault();
         e.stopPropagation();
         onToggleFavorite(photo.id, photo.is_favorite);
-      } else if (e.key.toLowerCase() === "k" && photo && onKeepPhoto) {
+      } else if (e.key.toLowerCase() === "k" && photo && photo.is_imported && onKeepPhoto) {
         e.preventDefault();
         e.stopPropagation();
         onKeepPhoto(photo.id);
@@ -127,7 +200,7 @@ export const EnlargedPhotoModal: React.FC<EnlargedPhotoModalProps> = ({
       } else if (e.key === " " && photo) {
         e.preventDefault();
         e.stopPropagation();
-        setIsZoomed((prev) => !prev);
+        handleToggleZoom();
       } else if (e.key.toLowerCase() === "r" && photo) {
         e.preventDefault();
         e.stopPropagation();
@@ -137,7 +210,7 @@ export const EnlargedPhotoModal: React.FC<EnlargedPhotoModalProps> = ({
 
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [isOpen, photo, currentIndex, photos]);
+  }, [isOpen, photo, currentIndex, photos, zoomScale]);
 
   // Scroll active thumbnail into view
   useEffect(() => {
@@ -170,7 +243,10 @@ export const EnlargedPhotoModal: React.FC<EnlargedPhotoModalProps> = ({
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col justify-between bg-black/95 backdrop-blur-2xl text-white select-none transition-all duration-200"
-      onClick={() => setIsZoomed(false)}
+      onClick={() => {
+        setZoomScale(1.0);
+        setPanOffset({ x: 0, y: 0 });
+      }}
     >
       {/* Top Header Bar */}
       <div
@@ -190,6 +266,7 @@ export const EnlargedPhotoModal: React.FC<EnlargedPhotoModalProps> = ({
               {photo.width && photo.height ? `${photo.width} × ${photo.height} · ` : ""}
               {(photo.size / (1024 * 1024)).toFixed(2)} MB
               {photo.location_name ? ` · ${photo.location_name}` : ""}
+              {isVideo ? " · Video" : ""}
             </span>
           </div>
         </div>
@@ -204,6 +281,38 @@ export const EnlargedPhotoModal: React.FC<EnlargedPhotoModalProps> = ({
             </div>
           )}
 
+          {/* Zoom Controls Bar */}
+          <div className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-white/10 border border-white/10 mr-1">
+            <button
+              onClick={() => {
+                setZoomScale((prev) => Math.max(0.6, Number((prev - 0.25).toFixed(2))));
+              }}
+              className="p-1 rounded hover:bg-white/20 text-white/80 hover:text-white transition-all"
+              title="Zoom Out"
+            >
+              <ZoomOut size={14} />
+            </button>
+            <button
+              onClick={() => {
+                setZoomScale(1.0);
+                setPanOffset({ x: 0, y: 0 });
+              }}
+              className="px-1.5 py-0.5 rounded text-[11px] font-mono hover:bg-white/20 text-white/90"
+              title="Reset Zoom to 100%"
+            >
+              {Math.round(zoomScale * 100)}%
+            </button>
+            <button
+              onClick={() => {
+                setZoomScale((prev) => Math.min(5.0, Number((prev + 0.25).toFixed(2))));
+              }}
+              className="p-1 rounded hover:bg-white/20 text-white/80 hover:text-white transition-all"
+              title="Zoom In"
+            >
+              <ZoomIn size={14} />
+            </button>
+          </div>
+
           {/* Rotate 90° Clockwise */}
           <button
             onClick={handleRotate}
@@ -216,7 +325,7 @@ export const EnlargedPhotoModal: React.FC<EnlargedPhotoModalProps> = ({
             )}
           </button>
 
-          {/* Auto Rotate button (Portrait default) */}
+          {/* Auto Rotate button */}
           <button
             onClick={handleAutoRotate}
             className={`p-2 rounded-lg transition-all flex items-center gap-1 ${
@@ -245,27 +354,18 @@ export const EnlargedPhotoModal: React.FC<EnlargedPhotoModalProps> = ({
             <Info3DIcon size={18} />
           </button>
 
-          {/* Zoom Toggle */}
-          <button
-            onClick={() => setIsZoomed((prev) => !prev)}
-            className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-all"
-            title={isZoomed ? "Actual Size (Space)" : "Zoom In (Space)"}
-          >
-            {isZoomed ? <Minimize size={16} /> : <Maximize size={16} />}
-          </button>
-
-          {/* Keep Action (K) */}
-          {onKeepPhoto && (
+          {/* Save to Library Action (ONLY shown when photo is an uncommitted import!) */}
+          {photo.is_imported && onKeepPhoto && (
             <button
               onClick={() => {
                 onKeepPhoto(photo.id);
                 handleNext();
               }}
-              className="px-2.5 py-1.5 rounded-lg bg-emerald-600/80 hover:bg-emerald-600 text-white text-xs font-medium flex items-center gap-1 transition-all"
-              title="Keep photo (K)"
+              className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md"
+              title="Save to Library (K)"
             >
-              <Check size={14} />
-              <span className="hidden sm:inline">Keep</span>
+              <Check size={14} className="stroke-[2.5]" />
+              <span className="hidden sm:inline">Save to Library</span>
               <span className="text-[10px] opacity-75 font-mono">K</span>
             </button>
           )}
@@ -299,19 +399,6 @@ export const EnlargedPhotoModal: React.FC<EnlargedPhotoModalProps> = ({
             )
           )}
 
-          {/* Keep / Save Action (K) */}
-          {onKeepPhoto && !photo.is_trashed && (
-            <button
-              onClick={() => onKeepPhoto(photo.id)}
-              className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium flex items-center gap-1.5 transition-all shadow-sm"
-              title="Mark as Saved & Auto-sort (K)"
-            >
-              <Check size={14} className="stroke-[2.5]" />
-              <span className="hidden sm:inline">Save</span>
-              <span className="text-[10px] opacity-75 font-mono">K</span>
-            </button>
-          )}
-
           {/* Favorite Action (F) */}
           <button
             onClick={() => onToggleFavorite(photo.id, photo.is_favorite)}
@@ -339,8 +426,14 @@ export const EnlargedPhotoModal: React.FC<EnlargedPhotoModalProps> = ({
         </div>
       </div>
 
-      {/* Main Photo Viewing Canvas with Left & Right Nav Buttons */}
-      <div className="relative flex-1 flex items-center justify-center p-4 md:p-8 overflow-hidden">
+      {/* Main Media Viewing Canvas with Left & Right Nav Buttons */}
+      <div
+        ref={canvasContainerRef}
+        className="relative flex-1 flex items-center justify-center p-4 md:p-8 overflow-hidden"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+      >
         {/* Clickable Left (Previous) Navigation Button */}
         {canGoPrev && (
           <button
@@ -356,49 +449,79 @@ export const EnlargedPhotoModal: React.FC<EnlargedPhotoModalProps> = ({
           </button>
         )}
 
-        {/* Center Image Container */}
+        {/* Center Media Container */}
         <div
-          className={`relative flex items-center justify-center max-w-full max-h-full transition-transform duration-200 ${
-            isZoomed ? "scale-125 cursor-zoom-out" : "cursor-zoom-in"
+          className={`relative flex items-center justify-center max-w-full max-h-full select-none ${
+            zoomScale > 1.05
+              ? isDragging
+                ? "cursor-grabbing"
+                : "cursor-grab"
+              : "cursor-zoom-in"
           }`}
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsZoomed((prev) => !prev);
-          }}
+          onClick={(e) => e.stopPropagation()}
         >
           {/* Subtle loading spinner while high-res loads */}
           {!imageLoaded && (
-            <div className="absolute inset-0 flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="w-10 h-10 border-2 border-white/20 border-t-white rounded-full animate-spin" />
             </div>
           )}
 
-          <img
-            src={fullImageSrc}
-            alt={fileName}
-            style={{ transform: `rotate(${rotation}deg)` }}
-            onLoad={() => setImageLoaded(true)}
-            onError={(e) => {
-              // Fallback to thumbnail or placeholder if 1600px fails
-              const target = e.target as HTMLImageElement;
-              if (target.src !== fallbackSrc) {
-                target.src = fallbackSrc;
-              } else {
-                target.src =
-                  "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1600&auto=format&fit=crop&q=80";
-              }
-              setImageLoaded(true);
-            }}
-            className={`max-w-[88vw] max-h-[72vh] md:max-h-[76vh] object-contain rounded-lg shadow-2xl transition-all duration-300 ${
-              imageLoaded ? "opacity-100" : "opacity-40"
-            }`}
-          />
+          {/* VIDEO PLAYER */}
+          {isVideo ? (
+            <div
+              style={{
+                transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale}) rotate(${rotation}deg)`,
+                transformOrigin: "center center",
+                transition: isDragging ? "none" : "transform 0.15s ease-out",
+              }}
+              className="relative flex items-center justify-center"
+            >
+              <video
+                ref={videoRef}
+                src={`/media/raw/${photo.id}`}
+                poster={`/media/${photo.id}?w=1600`}
+                controls
+                autoPlay
+                playsInline
+                onLoadedData={() => setImageLoaded(true)}
+                onDoubleClick={handleToggleZoom}
+                className="max-w-[88vw] max-h-[72vh] md:max-h-[76vh] object-contain rounded-lg shadow-2xl bg-black"
+              />
+            </div>
+          ) : (
+            /* IMAGE VIEWER */
+            <img
+              src={fullImageSrc}
+              alt={fileName}
+              style={{
+                transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale}) rotate(${rotation}deg)`,
+                transformOrigin: "center center",
+                transition: isDragging ? "none" : "transform 0.15s ease-out",
+              }}
+              onLoad={() => setImageLoaded(true)}
+              onDoubleClick={handleToggleZoom}
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                if (target.src !== fallbackSrc) {
+                  target.src = fallbackSrc;
+                } else {
+                  target.src =
+                    "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1600&auto=format&fit=crop&q=80";
+                }
+                setImageLoaded(true);
+              }}
+              className={`max-w-[88vw] max-h-[72vh] md:max-h-[76vh] object-contain rounded-lg shadow-2xl ${
+                imageLoaded ? "opacity-100" : "opacity-40"
+              }`}
+            />
+          )}
 
           {/* Video Indicator Overlay */}
-          {photo.is_video && (
-            <div className="absolute bottom-4 left-4 px-3 py-1.5 rounded-lg bg-black/70 backdrop-blur-md text-white text-xs font-semibold flex items-center gap-2 border border-white/20">
+          {isVideo && (
+            <div className="absolute bottom-4 left-4 px-3 py-1.5 rounded-lg bg-black/70 backdrop-blur-md text-white text-xs font-semibold flex items-center gap-2 border border-white/20 pointer-events-none">
               <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-              <span>Video File</span>
+              <span>Video Playback</span>
             </div>
           )}
         </div>
@@ -453,7 +576,7 @@ export const EnlargedPhotoModal: React.FC<EnlargedPhotoModalProps> = ({
                 <span className="font-medium text-white text-right truncate max-w-[170px]">
                   {photo.camera_make
                     ? `${photo.camera_make.charAt(0).toUpperCase() + photo.camera_make.slice(1)} ${photo.camera_model || ""}`.trim()
-                    : photo.camera_model || "Digital Image"}
+                    : photo.camera_model || (isVideo ? "Video Clip" : "Digital Image")}
                 </span>
               </div>
 
@@ -571,7 +694,8 @@ export const EnlargedPhotoModal: React.FC<EnlargedPhotoModalProps> = ({
                 key={item.id}
                 onClick={() => {
                   setImageLoaded(false);
-                  setIsZoomed(false);
+                  setZoomScale(1.0);
+                  setPanOffset({ x: 0, y: 0 });
                   setShowInfo(false);
                   onSelectPhoto(item);
                 }}
@@ -597,6 +721,11 @@ export const EnlargedPhotoModal: React.FC<EnlargedPhotoModalProps> = ({
                     ★
                   </div>
                 )}
+                {item.is_video && (
+                  <div className="absolute bottom-0.5 right-0.5 px-1 rounded bg-black/70 text-[8px] font-mono text-white">
+                    ▶
+                  </div>
+                )}
               </button>
             );
           })}
@@ -606,7 +735,7 @@ export const EnlargedPhotoModal: React.FC<EnlargedPhotoModalProps> = ({
         <div className="hidden md:flex items-center gap-2 text-[10px] font-mono text-white/50 shrink-0 px-2 py-1 rounded bg-white/5 border border-white/10">
           <span>← / → : Navigate</span>
           <span>·</span>
-          <span>Space : Zoom</span>
+          <span>Trackpad Pinch / Space : Zoom</span>
           <span>·</span>
           <span>F : Fav</span>
         </div>

@@ -140,10 +140,14 @@ export const api = {
     }
   },
 
-  async createFolder(name: string, is_hidden: boolean = false): Promise<FolderItem> {
+  async createFolder(
+    name: string,
+    is_hidden: boolean = false,
+    storage_mode: "virtual" | "physical" = "virtual"
+  ): Promise<FolderItem> {
     return jsonRequest<FolderItem>("/api/folders", {
       method: "POST",
-      body: JSON.stringify({ name, is_hidden }),
+      body: JSON.stringify({ name, is_hidden, storage_mode }),
     });
   },
 

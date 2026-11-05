@@ -10,7 +10,7 @@ interface SidebarProps {
   stats: LibraryStats;
   onOpenSync: () => void;
   folders?: FolderItem[];
-  onCreateFolder?: (name: string) => Promise<void>;
+  onCreateFolder?: (name: string, storageMode?: "virtual" | "physical") => Promise<void>;
   onDeleteFolder?: (folder: FolderItem) => void;
   onDropOnFolder?: (folderId: number, photoIds: number[]) => Promise<void>;
   onDropOnCategory?: (category: string, photoIds: number[]) => Promise<void>;
@@ -38,6 +38,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [videosExpanded, setVideosExpanded] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [storageMode, setStorageMode] = useState<"virtual" | "physical">("virtual");
   const [dropTarget, setDropTarget] = useState<string | null>(null);
 
   const regularFolders = folders.filter((f) => !f.is_hidden);
@@ -46,8 +47,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const handleCreateFolderSubmit = async () => {
     if (!newFolderName.trim() || !onCreateFolder) return;
     try {
-      await onCreateFolder(newFolderName.trim());
+      await onCreateFolder(newFolderName.trim(), storageMode);
       setNewFolderName("");
+      setStorageMode("virtual");
       setIsCreatingFolder(false);
     } catch (err) {
       console.error("Failed to create folder:", err);
@@ -340,11 +342,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {/* Inline Folder Creation Form */}
           {isCreatingFolder && (
-            <div className="p-2 mb-2 rounded-xl bg-[var(--surface-hover)] border border-[var(--glass-border)] shadow-sm space-y-1.5">
+            <div className="p-2.5 mb-2 rounded-xl bg-[var(--surface-hover)] border border-[var(--glass-border)] shadow-sm space-y-2">
               <input
                 type="text"
                 autoFocus
-                placeholder="Folder name (e.g. Friend's Photos)"
+                placeholder="Folder name (e.g. Vacation 2026)"
                 value={newFolderName}
                 onChange={(e) => setNewFolderName(e.target.value)}
                 onKeyDown={(e) => {
@@ -352,15 +354,53 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   if (e.key === "Escape") {
                     setIsCreatingFolder(false);
                     setNewFolderName("");
+                    setStorageMode("virtual");
                   }
                 }}
                 className="w-full px-2 py-1 rounded-md text-xs bg-[var(--button-bg)] border border-[var(--button-border)] text-[var(--text-main)] outline-none focus:border-[var(--accent)]"
               />
-              <div className="flex items-center justify-end gap-1.5">
+
+              {/* Storage Mode Choice */}
+              <div className="space-y-1 pt-1 border-t border-[var(--glass-border)]/60">
+                <div className="text-[10px] font-semibold text-[var(--text-faint)] uppercase tracking-wider">
+                  Organization Type
+                </div>
+
+                <label className="flex items-start gap-1.5 p-1 rounded-md hover:bg-[var(--button-hover)] cursor-pointer select-none">
+                  <input
+                    type="radio"
+                    name="folder-mode"
+                    checked={storageMode === "virtual"}
+                    onChange={() => setStorageMode("virtual")}
+                    className="mt-0.5 accent-blue-600 cursor-pointer"
+                  />
+                  <div className="text-[11px] leading-tight">
+                    <span className="font-medium text-[var(--text-main)] block">See all category photos</span>
+                    <span className="text-[9.5px] text-[var(--text-muted)] block">Keeps photos in original categories and references them here.</span>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-1.5 p-1 rounded-md hover:bg-[var(--button-hover)] cursor-pointer select-none">
+                  <input
+                    type="radio"
+                    name="folder-mode"
+                    checked={storageMode === "physical"}
+                    onChange={() => setStorageMode("physical")}
+                    className="mt-0.5 accent-blue-600 cursor-pointer"
+                  />
+                  <div className="text-[11px] leading-tight">
+                    <span className="font-medium text-[var(--text-main)] block">Store photos separately</span>
+                    <span className="text-[9.5px] text-[var(--text-muted)] block">Creates a dedicated folder on disk to store files separately.</span>
+                  </div>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-1.5 pt-0.5">
                 <button
                   onClick={() => {
                     setIsCreatingFolder(false);
                     setNewFolderName("");
+                    setStorageMode("virtual");
                   }}
                   className="px-2 py-0.5 rounded text-[11px] text-[var(--text-muted)] hover:text-[var(--text-main)]"
                 >

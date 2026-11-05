@@ -112,6 +112,65 @@ class TestPhase6ReactFrontend(unittest.TestCase):
         self.assertFalse(body.get("tunnel_enabled"))
         self.assertIsNone(body.get("tunnel_url"))
 
+    def test_gps_dms_parser(self):
+        """Test EXIF GPS DMS coordinate parser with edge cases (NaN, bytes ref, negatives)."""
+        from neural_gallery.scan import _parse_dms, _extract_gps
+        # Standard positive degrees
+        res = _parse_dms((37, 46, 29.8), "N")
+        self.assertIsNotNone(res)
+        self.assertAlmostEqual(res, 37.77494, places=4)
+
+        # Negative longitude with bytes ref
+        res_west = _parse_dms((122, 25, 9.8), b"W")
+        self.assertIsNotNone(res_west)
+        self.assertAlmostEqual(res_west, -122.41938, places=4)
+
+        # South latitude
+        res_south = _parse_dms((33, 51, 0.0), "S")
+        self.assertIsNotNone(res_south)
+        self.assertAlmostEqual(res_south, -33.85, places=2)
+
+        # Reject NaN values from Samsung/Android empty GPS tags
+        nan_res = _parse_dms((float("nan"), float("nan"), float("nan")), "N")
+        self.assertIsNone(nan_res)
+
+        # Reject null island in _extract_gps
+        lat, lon, alt = _extract_gps({2: (0, 0, 0), 1: "N", 4: (0, 0, 0), 3: "E"})
+        self.assertIsNone(lat)
+        self.assertIsNone(lon)
+
+    def test_folder_creation_storage_mode(self):
+        """Test creating folders with virtual collection vs separate physical storage."""
+        # 1. Virtual collection
+        conn = HTTPConnection("127.0.0.1", self.port)
+        conn.request(
+            "POST",
+            "/api/folders",
+            json.dumps({"name": "Family Vacations", "storage_mode": "virtual"}),
+            {"Content-Type": "application/json", "X-Neural-Gallery": "1"},
+        )
+        resp = conn.getresponse()
+        self.assertEqual(resp.status, 200)
+        data = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+        self.assertEqual(data["name"], "Family Vacations")
+        self.assertEqual(data["storage_mode"], "virtual")
+
+        # 2. Physical storage folder
+        conn = HTTPConnection("127.0.0.1", self.port)
+        conn.request(
+            "POST",
+            "/api/folders",
+            json.dumps({"name": "Private Project", "storage_mode": "physical"}),
+            {"Content-Type": "application/json", "X-Neural-Gallery": "1"},
+        )
+        resp = conn.getresponse()
+        self.assertEqual(resp.status, 200)
+        data_phys = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+        self.assertEqual(data_phys["name"], "Private Project")
+        self.assertEqual(data_phys["storage_mode"], "physical")
+
 
 if __name__ == "__main__":
     unittest.main()
