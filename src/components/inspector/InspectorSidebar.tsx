@@ -536,8 +536,19 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
             <div className="text-xs font-semibold text-[var(--text-main)]">
               No Map Coordinates
             </div>
-            <div className="text-[10px] text-[var(--text-muted)] mt-1 max-w-[220px] leading-relaxed">
-              {locationName ? `Labeled as "${locationName}", but lacks GPS coordinates.` : "No GPS coordinates found in EXIF. Note: WhatsApp, screenshots, and social apps remove location data before sharing."}
+            <div className="text-[10px] text-[var(--text-muted)] mt-1.5 max-w-[240px] leading-relaxed text-left space-y-1">
+              {locationName ? (
+                <p>Labeled as <strong className="text-[var(--text-main)]">"{locationName}"</strong>, but lacks numeric coordinates.</p>
+              ) : (
+                <>
+                  <p className="text-[var(--text-secondary)] font-medium text-center">Why GPS might not be shown:</p>
+                  <ul className="list-disc pl-3.5 space-y-1 text-[9.5px] text-[var(--text-muted)]">
+                    <li><strong>iPhone Web Upload:</strong> iOS Safari strips GPS by default unless you tap <em>Options &gt; Location / All Photos Data</em> in the picker.</li>
+                    <li><strong>Samsung / Android:</strong> Photos taken without a satellite lock write dummy tags (<code className="font-mono">NaN</code> coordinates).</li>
+                    <li><strong>WhatsApp / Social:</strong> Messaging apps strip all location metadata for privacy.</li>
+                  </ul>
+                </>
+              )}
             </div>
           </div>
         )}

@@ -915,6 +915,13 @@ MOBILE_PWA_HTML = """<!DOCTYPE html>
     </button>
   </div>
 
+  <!-- GPS Preservation Tip Card -->
+  <div style="margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); font-size: 11px; color: #94a3b8; line-height: 1.45; text-align: left;">
+    <strong style="color: #60a5fa; display: block; margin-bottom: 2px;">📍 Preserving Photo Location (GPS):</strong>
+    <span>• <strong>iPhone:</strong> In the iOS photo picker, tap <em>Options</em> (top/bottom) and toggle <em>Location</em> or <em>All Photos Data</em> ON so Safari doesn't strip location.<br>
+    • <strong>Android / WhatsApp:</strong> Social apps strip GPS before saving; camera photos need Location enabled with an active GPS satellite lock.</span>
+  </div>
+
   <!-- Progress Box -->
   <div class="progress-box" id="progress-box" style="display: none;">
     <div class="progress-meta">
