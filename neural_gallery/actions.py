@@ -257,8 +257,19 @@ def auto_sort_imported_photo(connection: sqlite3.Connection, file_id: int) -> st
 
     path_str = (row["path"] or "").lower()
     cat = "all"
+    label = "keep"
 
-    if row["is_screenshot"]:
+    is_noise_or_blur = (
+        row["label"] == "noise"
+        or row["category"] == "noise"
+        or (row["quality_score"] is not None and row["quality_score"] <= 4.0)
+        or (row["blur_score"] is not None and row["blur_score"] >= 6.0)
+    )
+
+    if is_noise_or_blur:
+        cat = "noise"
+        label = "noise"
+    elif row["is_screenshot"]:
         if row["is_video"]:
             cat = "screen-recordings"
         else:
@@ -301,8 +312,8 @@ def auto_sort_imported_photo(connection: sqlite3.Connection, file_id: int) -> st
                 cat = "travel"
 
     connection.execute(
-        "UPDATE files SET is_imported = 0, label = 'keep', category = ? WHERE id = ?",
-        (cat, file_id),
+        "UPDATE files SET is_imported = 0, label = ?, category = ? WHERE id = ?",
+        (label, cat, file_id),
     )
     connection.commit()
     return cat

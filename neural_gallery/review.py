@@ -842,6 +842,99 @@ def person_photos(connection, person_key: str) -> dict:
     }
 
 
+def _face_avatar_from_row(row, size: int = 256) -> bytes | None:
+    try:
+        from pathlib import Path
+        from PIL import Image, ImageOps
+        import io
+
+        path = Path(row["path"])
+        if not path.is_file():
+            return None
+        with Image.open(path) as img:
+            oriented = ImageOps.exif_transpose(img)
+            w, h = oriented.size
+            cx = (float(row["x"]) + float(row["w"]) / 2.0) * w
+            cy = (1.0 - (float(row["y"]) + float(row["h"]) / 2.0)) * h
+            face_size = max(float(row["w"]) * w, float(row["h"]) * h)
+            box_size = int(face_size * 1.9)
+            left = max(0, int(cx - box_size // 2))
+            top = max(0, int(cy - box_size // 2))
+            right = min(w, left + box_size)
+            bottom = min(h, top + box_size)
+            crop = oriented.crop((left, top, right, bottom))
+            crop_w, crop_h = crop.size
+            edge = max(crop_w, crop_h)
+            if crop_w != edge or crop_h != edge:
+                square = Image.new("RGB", (edge, edge), (128, 128, 128))
+                square.paste(crop, ((edge - crop_w) // 2, (edge - crop_h) // 2))
+                crop = square
+            crop = crop.resize((size, size), Image.Resampling.LANCZOS)
+            buf = io.BytesIO()
+            crop.convert("RGB").save(buf, format="JPEG", quality=88)
+            return buf.getvalue()
+    except Exception:
+        return None
+
+
+def _person_face_avatar(connection, person_key: str, size: int = 256) -> bytes | None:
+    row = connection.execute(
+        """
+        SELECT faces.id, faces.file_id, faces.x, faces.y, faces.w, faces.h, files.path
+        FROM faces
+        JOIN files ON files.id = faces.file_id
+        WHERE faces.person_key = ?
+        ORDER BY faces.confidence DESC, faces.quality_score DESC, (faces.w * faces.h) DESC
+        LIMIT 1
+        """,
+        (person_key,),
+    ).fetchone()
+    if row:
+        avatar = _face_avatar_from_row(row, size)
+        if avatar:
+            return avatar
+    sample = connection.execute(
+        """
+        SELECT files.path FROM faces
+        JOIN files ON files.id = faces.file_id
+        WHERE faces.person_key = ? LIMIT 1
+        """,
+        (person_key,),
+    ).fetchone()
+    if sample and Path(sample["path"]).is_file():
+        try:
+            from PIL import Image, ImageOps
+            import io
+            with Image.open(sample["path"]) as img:
+                oriented = ImageOps.exif_transpose(img)
+                w, h = oriented.size
+                edge = min(w, h)
+                crop = oriented.crop(((w - edge) // 2, (h - edge) // 2, (w + edge) // 2, (h + edge) // 2))
+                crop = crop.resize((size, size), Image.Resampling.LANCZOS)
+                buf = io.BytesIO()
+                crop.convert("RGB").save(buf, format="JPEG", quality=85)
+                return buf.getvalue()
+        except Exception:
+            pass
+    return None
+
+
+def _face_avatar(connection, face_id: int, size: int = 256) -> bytes | None:
+    row = connection.execute(
+        """
+        SELECT faces.id, faces.file_id, faces.x, faces.y, faces.w, faces.h, files.path
+        FROM faces
+        JOIN files ON files.id = faces.file_id
+        WHERE faces.id = ?
+        LIMIT 1
+        """,
+        (face_id,),
+    ).fetchone()
+    if row:
+        return _face_avatar_from_row(row, size)
+    return None
+
+
 def _stats(connection) -> dict:
     def count(sql: str) -> int:
         return int(connection.execute(sql).fetchone()[0])
@@ -862,14 +955,20 @@ def _stats(connection) -> dict:
         "faces": count("SELECT COUNT(*) FROM faces WHERE file_id IN (SELECT id FROM files WHERE is_imported = 0)"),
         "people": count(
             """
-            SELECT COUNT(*) FROM (
-                SELECT person_key FROM faces
-                WHERE person_key IS NOT NULL AND file_id IN (SELECT id FROM files WHERE is_imported = 0)
-                GROUP BY person_key HAVING COUNT(*) >= 1
-            )
+            SELECT COUNT(DISTINCT faces.person_key) FROM faces
+            LEFT JOIN people ON people.person_key = faces.person_key
+            WHERE faces.person_key IS NOT NULL AND COALESCE(people.is_pet, 0) = 0
+              AND faces.file_id IN (SELECT id FROM files WHERE is_imported = 0)
             """
         ),
-        "pets": count("SELECT COUNT(*) FROM people WHERE is_pet = 1"),
+        "pets": count(
+            """
+            SELECT COUNT(DISTINCT faces.person_key) FROM faces
+            JOIN people ON people.person_key = faces.person_key
+            WHERE faces.person_key IS NOT NULL AND people.is_pet = 1
+              AND faces.file_id IN (SELECT id FROM files WHERE is_imported = 0)
+            """
+        ),
         "candidates": count(
             """
             SELECT COUNT(*) FROM faces
@@ -878,7 +977,7 @@ def _stats(connection) -> dict:
             """
         ),
         "keep": count("SELECT COUNT(*) FROM files WHERE label = 'keep' AND is_imported = 0 AND is_trashed = 0"),
-        "noise": count("SELECT COUNT(*) FROM files WHERE label = 'noise' AND is_imported = 0 AND is_trashed = 0"),
+        "noise": count("SELECT COUNT(*) FROM files WHERE (category = 'noise' OR label = 'noise' OR blur_score >= 6.0 OR quality_score <= 4.0) AND is_imported = 0 AND is_trashed = 0"),
         "panoramas": count("SELECT COUNT(*) FROM files WHERE ((width * 1.0 / NULLIF(height, 0)) >= 2.2 OR is_panorama = 1) AND is_imported = 0 AND is_trashed = 0"),
         "documents": count("SELECT COUNT(*) FROM files WHERE (id IN (SELECT file_id FROM asset_ocr) OR category = 'document' OR is_document = 1) AND is_imported = 0 AND is_trashed = 0"),
         "shared_albums": count("SELECT COUNT(*) FROM shared_albums"),
@@ -937,8 +1036,8 @@ def query_photos(
         where.append("(id IN (SELECT file_id FROM asset_ocr) OR category = 'document') AND is_imported = 0 AND is_trashed = 0")
     elif cat == "duplicates":
         where.append("id IN (SELECT file_id FROM dup_groups) AND is_imported = 0 AND is_trashed = 0")
-    elif cat in ("low-quality", "low_quality"):
-        where.append("(blur_score < 40.0 OR quality_score < 4.0) AND is_imported = 0 AND is_trashed = 0")
+    elif cat in ("noise", "noise-blur", "noise_blur", "low-quality", "low_quality"):
+        where.append("(category = 'noise' OR label = 'noise' OR blur_score >= 6.0 OR quality_score <= 4.0) AND is_imported = 0 AND is_trashed = 0")
     elif cat == "inbox":
         where.append("label IS NULL AND is_imported = 0 AND is_trashed = 0")
     elif cat == "hidden":
@@ -952,11 +1051,15 @@ def query_photos(
         if f_id.isdigit():
             where.append("id IN (SELECT file_id FROM shared_album_files WHERE album_id = ?) AND is_imported = 0 AND is_trashed = 0")
             params.append(int(f_id))
+    elif cat.startswith("person:"):
+        pkey = cat.split("person:")[1].strip()
+        where.append("id IN (SELECT file_id FROM faces WHERE person_key = ?) AND is_imported = 0 AND is_trashed = 0")
+        params.append(pkey)
     elif cat in ("pets", "people"):
         if cat == "pets":
             where.append("id IN (SELECT file_id FROM faces JOIN people ON people.person_key = faces.person_key WHERE people.is_pet = 1) AND is_imported = 0 AND is_trashed = 0")
         else:
-            where.append("id IN (SELECT file_id FROM faces) AND is_imported = 0 AND is_trashed = 0")
+            where.append("id IN (SELECT file_id FROM faces LEFT JOIN people ON people.person_key = faces.person_key WHERE COALESCE(people.is_pet, 0) = 0) AND is_imported = 0 AND is_trashed = 0")
     else:
         where.append("category = ? AND is_imported = 0 AND is_trashed = 0 AND is_hidden = 0")
         params.append(cat)
@@ -969,9 +1072,10 @@ def query_photos(
             files.camera_model LIKE ? OR
             files.location_name LIKE ? OR
             files.id IN (SELECT file_id FROM asset_ocr WHERE text LIKE ?) OR
-            files.id IN (SELECT file_id FROM faces JOIN people ON people.person_key = faces.person_key WHERE people.name LIKE ?)
+            files.id IN (SELECT file_id FROM faces JOIN people ON people.person_key = faces.person_key WHERE people.name LIKE ?) OR
+            files.id IN (SELECT file_id FROM faces WHERE person_key LIKE ?)
         )""")
-        params.extend([q, q, q, q, q, q])
+        params.extend([q, q, q, q, q, q, q])
 
     order_clause = "ORDER BY id DESC"
     if sort == "date_desc":
@@ -1467,6 +1571,36 @@ def make_handler(db_path: Path):
                     self._json(200, list_people(connection))
                 finally:
                     connection.close()
+                return
+            if parsed.path.startswith("/api/person/") and parsed.path.endswith("/avatar"):
+                person_key = _person_key(parsed.path.removeprefix("/api/person/").removesuffix("/avatar"))
+                if not person_key:
+                    self._send(404, b"", "text/plain")
+                    return
+                connection = connect(db_path)
+                try:
+                    avatar_bytes = _person_face_avatar(connection, person_key)
+                finally:
+                    connection.close()
+                if avatar_bytes:
+                    self._send(200, avatar_bytes, "image/jpeg")
+                else:
+                    self._send(404, b"", "text/plain")
+                return
+            if parsed.path.startswith("/api/face/") and parsed.path.endswith("/avatar"):
+                token = parsed.path.removeprefix("/api/face/").removesuffix("/avatar")
+                if not token.isdigit():
+                    self._send(404, b"", "text/plain")
+                    return
+                connection = connect(db_path)
+                try:
+                    avatar_bytes = _face_avatar(connection, int(token))
+                finally:
+                    connection.close()
+                if avatar_bytes:
+                    self._send(200, avatar_bytes, "image/jpeg")
+                else:
+                    self._send(404, b"", "text/plain")
                 return
             if parsed.path.startswith("/media/raw/"):
                 token = parsed.path.removeprefix("/media/raw/")

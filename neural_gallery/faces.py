@@ -342,13 +342,17 @@ def list_people(connection: sqlite3.Connection) -> list[dict]:
     return [
         {
             "person_key": row["person_key"],
+            "key": row["person_key"],
             "name": row["name"] or "",
             "face_count": row["face_count"],
             "photo_count": row["photo_count"],
+            "count": row["photo_count"],
             "sample_id": row["sample_id"],
             "is_favorite": bool(row["is_favorite"]),
             "is_pet": bool(row["is_pet"]),
             "pet_type": row["pet_type"],
+            "avatar_url": f"/api/person/{row['person_key']}/avatar",
+            "thumb": f"/api/person/{row['person_key']}/avatar",
         }
         for row in rows
     ]
@@ -404,6 +408,8 @@ def list_candidates(connection: sqlite3.Connection, limit: int = 24) -> list[dic
             "box": [row["x"], row["y"], row["w"], row["h"]],
             "confidence": row["confidence"],
             "person_key": row["person_key"] or f"p{row['id']}",
+            "avatar_url": f"/api/face/{row['id']}/avatar",
+            "thumb": f"/api/face/{row['id']}/avatar",
         }
         for row in rows
     ]

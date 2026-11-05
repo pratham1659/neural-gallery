@@ -938,6 +938,19 @@ export const App: React.FC = () => {
     refreshData();
   };
 
+  const handleRenamePerson = async (person_key: string, name: string, is_pet: boolean) => {
+    await api.namePerson(person_key, name, is_pet);
+    setPeople((prev) =>
+      prev.map((p) => (p.key === person_key ? { ...p, name, is_pet } : p))
+    );
+    refreshData();
+  };
+
+  const handleSelectPerson = (person: PersonGroup) => {
+    setCurrentCategory(`person:${person.key}`);
+    setActiveView("timeline");
+  };
+
   const hasSelectedFavorites = photos.some((p) => selectedPhotoIds.has(p.id) && p.is_favorite);
 
   return (
@@ -1179,11 +1192,14 @@ export const App: React.FC = () => {
                 />
               )}
 
-              {activeView === "people" && (
+              {(activeView === "people" || activeView === "pets") && (
                 <PeopleView
+                  mode={activeView === "pets" ? "pets" : "people"}
                   people={people}
                   candidates={candidates}
                   onConfirmCandidate={handleConfirmCandidate}
+                  onRenamePerson={handleRenamePerson}
+                  onSelectPerson={handleSelectPerson}
                 />
               )}
             </>

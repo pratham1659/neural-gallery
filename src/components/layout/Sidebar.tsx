@@ -116,7 +116,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onChangeView("timeline");
               }}
               className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
-                activeView === "timeline" && currentCategory !== "pets"
+                activeView === "timeline"
                   ? "bg-[var(--accent)] text-white shadow-sm font-semibold"
                   : "text-[var(--text-main)] hover:bg-[var(--button-hover)]"
               }`}
@@ -132,7 +132,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
               <span
                 className={`text-[11px] font-mono ${
-                  activeView === "timeline" && currentCategory !== "pets"
+                  activeView === "timeline"
                     ? "text-white/80"
                     : "text-[var(--text-muted)]"
                 }`}
@@ -224,12 +224,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {/* Pets View */}
             <button
-              onClick={() => {
-                onSelectCategory("pets");
-                onChangeView("timeline");
-              }}
+              onClick={() => onChangeView("pets")}
               className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
-                currentCategory === "pets"
+                activeView === "pets"
                   ? "bg-[var(--accent)] text-white shadow-sm font-semibold"
                   : "text-[var(--text-main)] hover:bg-[var(--button-hover)]"
               }`}
@@ -245,7 +242,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
               <span
                 className={`text-[11px] font-mono ${
-                  currentCategory === "pets" ? "text-white/80" : "text-[var(--text-muted)]"
+                  activeView === "pets" ? "text-white/80" : "text-[var(--text-muted)]"
                 }`}
               >
                 {stats.pets}
@@ -850,6 +847,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {(stats.imports ?? 0) > 0 ? (
                   <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-semibold">
                     {stats.imports}
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-[var(--text-muted)]">0</span>
+                )}
+              </div>
+            </button>
+
+            <button
+              onClick={() => onSelectCategory("noise")}
+              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
+                currentCategory === "noise"
+                  ? "bg-[var(--accent)] text-white shadow-sm"
+                  : "text-[var(--text-main)] hover:bg-[var(--button-hover)]"
+              }`}
+              title="Photos with high noise or blur detected"
+            >
+              <div className="flex items-center gap-2.5">
+                <img
+                  src="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Dotted%20line%20face/3D/dotted_line_face_3d.png"
+                  alt=""
+                  className="w-4 h-4 object-contain"
+                />
+                <span>Noise & Blur</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {(stats.noise ?? 0) > 0 ? (
+                  <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 font-semibold">
+                    {stats.noise}
                   </span>
                 ) : (
                   <span className="text-[11px] text-[var(--text-muted)]">0</span>

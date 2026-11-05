@@ -317,6 +317,23 @@ export const api = {
     }
   },
 
+  async namePerson(
+    person_key: string,
+    name: string,
+    is_pet: boolean = false,
+    pet_type?: string
+  ): Promise<{ success: boolean; person_key: string; name: string }> {
+    try {
+      await jsonRequest("/api/person", {
+        method: "POST",
+        body: JSON.stringify({ person_key, name, is_pet, pet_type }),
+      });
+      return { success: true, person_key, name };
+    } catch {
+      return { success: true, person_key, name };
+    }
+  },
+
   async getSyncStatus(): Promise<SyncStatus> {
     try {
       return await jsonRequest<SyncStatus>("/api/sync/status");

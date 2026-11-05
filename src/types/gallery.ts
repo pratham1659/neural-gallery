@@ -1,4 +1,4 @@
-export type ActiveView = "timeline" | "explorer" | "places" | "people";
+export type ActiveView = "timeline" | "explorer" | "places" | "people" | "pets";
 export type TimeScale = "years" | "months" | "days";
 export type CatalogStyle = "list" | "small" | "medium" | "large";
 export type ThemeMode = "light" | "dark";
@@ -99,6 +99,8 @@ export interface PersonGroup {
   count: number;
   is_pet: boolean;
   thumb?: string;
+  avatar_url?: string;
+  pet_type?: string;
 }
 
 export interface CandidateFace {
@@ -107,6 +109,7 @@ export interface CandidateFace {
   person_name: string;
   confidence: number;
   thumb?: string;
+  avatar_url?: string;
 }
 
 export interface MapPin {
