@@ -4,7 +4,7 @@ An encrypted, zero-knowledge local photo gallery and AI vault for Apple Silicon 
 
 Neural Gallery indexes media stored on your Mac, performs on-device face & pet recognition, extracts optical EXIF and GPS geography, clusters near-duplicates, and provides high-speed photo triage with zero cloud telemetry.
 
-> **Interactive UI Prototype:** Open [`preview.html`](preview.html) in any browser to explore the full Apple Photos & Google Photos-inspired gallery with Microsoft 3D illustrative icons, Places Map, Face Tracking, and P2P Wi-Fi Sync.
+> **Modern Web & Native Application:** Run `npm run tauri dev` or `npm run dev` to launch the full Apple Photos & Google Photos-inspired gallery with Microsoft 3D illustrative icons, Places Map, Face Tracking, and P2P Wi-Fi Sync.
 
 ---
 

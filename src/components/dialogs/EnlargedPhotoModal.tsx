@@ -299,6 +299,19 @@ export const EnlargedPhotoModal: React.FC<EnlargedPhotoModalProps> = ({
             )
           )}
 
+          {/* Keep / Save Action (K) */}
+          {onKeepPhoto && !photo.is_trashed && (
+            <button
+              onClick={() => onKeepPhoto(photo.id)}
+              className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium flex items-center gap-1.5 transition-all shadow-sm"
+              title="Mark as Saved & Auto-sort (K)"
+            >
+              <Check size={14} className="stroke-[2.5]" />
+              <span className="hidden sm:inline">Save</span>
+              <span className="text-[10px] opacity-75 font-mono">K</span>
+            </button>
+          )}
+
           {/* Favorite Action (F) */}
           <button
             onClick={() => onToggleFavorite(photo.id, photo.is_favorite)}
@@ -559,6 +572,7 @@ export const EnlargedPhotoModal: React.FC<EnlargedPhotoModalProps> = ({
                 onClick={() => {
                   setImageLoaded(false);
                   setIsZoomed(false);
+                  setShowInfo(false);
                   onSelectPhoto(item);
                 }}
                 className={`relative shrink-0 h-14 w-14 rounded-lg overflow-hidden border transition-all duration-150 cursor-pointer ${

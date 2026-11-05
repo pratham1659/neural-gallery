@@ -414,10 +414,17 @@ export const api = {
     }
   },
 
+  async saveImportedPhotos(ids: number[]): Promise<{ saved: number; success: boolean; categories?: Record<number, string> }> {
+    return jsonRequest<{ saved: number; success: boolean; categories?: Record<number, string> }>("/api/imports/save", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    });
+  },
+
   async indexFolder(folder: string, copy_to_vault: boolean = true): Promise<import("../types/gallery").ScanSummary> {
     return jsonRequest<import("../types/gallery").ScanSummary>("/api/scan", {
       method: "POST",
-      body: JSON.stringify({ folder, copy_to_vault }),
+      body: JSON.stringify({ folder, copy_to_vault, is_imported: true }),
     });
   },
 };

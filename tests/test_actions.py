@@ -6,7 +6,12 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from neural_gallery.actions import ActionError, move_indexed
+from neural_gallery.actions import (
+    ActionError,
+    auto_sort_imported_photo,
+    move_indexed,
+    save_imported_photos,
+)
 from neural_gallery.db import connect
 from neural_gallery.faces import assign_people, crop_box
 from neural_gallery.review import duplicate_group, person_photos
@@ -109,3 +114,51 @@ class PeopleTests(unittest.TestCase):
                 )
             finally:
                 connection.close()
+
+
+class ImportSaveTests(unittest.TestCase):
+    def test_auto_sort_imported_photo_categorizes_and_clears_imported(self):
+        with tempfile.TemporaryDirectory() as raw:
+            db_path = Path(raw) / "index.sqlite"
+            connection = connect(db_path)
+            try:
+                # 1. Screenshot
+                connection.execute(
+                    """
+                    INSERT INTO files(path, size, mtime, scanned_at, is_imported, is_screenshot)
+                    VALUES (?, 100, 1, 1, 1, 1)
+                    """,
+                    (str(Path(raw) / "screen.png"),),
+                )
+                fid1 = connection.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+                # 2. Raw photo
+                connection.execute(
+                    """
+                    INSERT INTO files(path, size, mtime, scanned_at, is_imported, is_raw)
+                    VALUES (?, 200, 1, 1, 1, 1)
+                    """,
+                    (str(Path(raw) / "photo.dng"),),
+                )
+                fid2 = connection.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+                cat1 = auto_sort_imported_photo(connection, fid1)
+                self.assertEqual(cat1, "screenshots")
+
+                res = save_imported_photos(connection, [fid2])
+                self.assertEqual(res["saved"], 1)
+                self.assertEqual(res["categories"][fid2], "raw")
+
+                # Verify is_imported is 0 and label is keep
+                row1 = connection.execute("SELECT is_imported, label, category FROM files WHERE id = ?", (fid1,)).fetchone()
+                self.assertEqual(row1["is_imported"], 0)
+                self.assertEqual(row1["label"], "keep")
+                self.assertEqual(row1["category"], "screenshots")
+
+                row2 = connection.execute("SELECT is_imported, label, category FROM files WHERE id = ?", (fid2,)).fetchone()
+                self.assertEqual(row2["is_imported"], 0)
+                self.assertEqual(row2["label"], "keep")
+                self.assertEqual(row2["category"], "raw")
+            finally:
+                connection.close()
+

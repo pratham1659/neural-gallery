@@ -64,7 +64,7 @@ def get_hostname() -> str:
 
 _TUNNEL_PROC: subprocess.Popen | None = None
 _TUNNEL_URL: str | None = None
-_TUNNEL_ENABLED: bool = True
+_TUNNEL_ENABLED: bool = False
 _TUNNEL_LOCK = threading.Lock()
 
 
@@ -212,6 +212,11 @@ class SyncEngine:
         self._previous_pin: str | None = None
         self._pin_ttl: int = 60  # Security OTP auto-rotates every 60 seconds when unpaired
         self._cert_fingerprint: str = hashlib.sha256(self.vault_id.encode()).hexdigest()[:16]
+        self._last_sync_time: float = 0.0
+        self._sync_batch_id: str = ""
+        self._sync_batch_count: int = 0
+        self._sync_batch_files: list[str] = []
+        self._total_synced: int = 0
 
     @property
     def sas_pin(self) -> str:
@@ -335,6 +340,13 @@ class SyncEngine:
             "pwa_url_direct": pwa_url_direct,
             "pwa_url_hostname": pwa_url_hostname,
             "pwa_url_tunnel": pwa_url_tunnel,
+            "last_sync": {
+                "batch_id": self._sync_batch_id,
+                "count": self._sync_batch_count,
+                "timestamp": self._last_sync_time,
+                "files": self._sync_batch_files[-10:],
+                "total_synced": self._total_synced,
+            } if self._sync_batch_id else None,
         }
 
     def ingest_bytes(
@@ -358,8 +370,8 @@ class SyncEngine:
 
         dest_path.write_bytes(data)
 
-        # Trigger incremental scanning
-        summary = scan_folder(incoming_folder, db_path)
+        # Trigger incremental scanning marked as imported
+        summary = scan_folder(incoming_folder, db_path, is_imported=True)
 
         # Retrieve indexed file record
         file_id = None
@@ -372,8 +384,22 @@ class SyncEngine:
             ).fetchone()
             if row:
                 file_id = row[0]
+                connection.execute("UPDATE files SET is_imported = 1 WHERE id = ?", (file_id,))
+                connection.commit()
         finally:
             connection.close()
+
+        # Batch grouping: uploads within 4 seconds belong to the same sync batch
+        now = time.time()
+        if now - self._last_sync_time > 4.0:
+            self._sync_batch_id = str(uuid.uuid4())
+            self._sync_batch_count = 1
+            self._sync_batch_files = [safe_name]
+        else:
+            self._sync_batch_count += 1
+            self._sync_batch_files.append(safe_name)
+        self._last_sync_time = now
+        self._total_synced += 1
 
         return {
             "success": True,
@@ -382,6 +408,8 @@ class SyncEngine:
             "size": len(data),
             "file_id": file_id,
             "scan_summary": summary,
+            "batch_id": self._sync_batch_id,
+            "batch_count": self._sync_batch_count,
         }
 
 
@@ -398,217 +426,515 @@ MOBILE_PWA_HTML = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Neural Gallery — P2P Wi-Fi Sync</title>
+<title>Neural Gallery — P2P Media Sync</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#0d1117">
+<meta name="theme-color" content="#070a13">
 <style>
   :root {
-    --bg: #090d16;
-    --card: rgba(22, 27, 34, 0.85);
-    --border: rgba(255, 255, 255, 0.1);
-    --accent: #2f81f7;
-    --accent-glow: rgba(47, 129, 247, 0.35);
-    --ink: #f0f6fc;
-    --muted: #8b949e;
-    --success: #3fb950;
+    --bg: #070a13;
+    --card: rgba(18, 24, 38, 0.88);
+    --card-border: rgba(255, 255, 255, 0.08);
+    --accent: #2563eb;
+    --accent-light: #60a5fa;
+    --accent-glow: rgba(37, 99, 235, 0.35);
+    --ink: #f8fafc;
+    --muted: #94a3b8;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   body {
     background: var(--bg);
     color: var(--ink);
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
     min-height: 100vh;
-    padding: env(safe-area-inset-top, 20px) 16px env(safe-area-inset-bottom, 24px);
+    padding: max(env(safe-area-inset-top), 20px) 16px max(env(safe-area-inset-bottom), 24px);
     display: flex;
     flex-direction: column;
     align-items: center;
+    background-image: radial-gradient(circle at 50% 0%, rgba(37, 99, 235, 0.15) 0%, transparent 60%);
   }
+
+  /* Header */
   .header {
     text-align: center;
-    margin: 20px 0 24px;
+    margin: 10px 0 20px;
     width: 100%;
-    max-width: 440px;
+    max-width: 460px;
   }
+  .app-logo {
+    width: 58px;
+    height: 58px;
+    margin: 0 auto 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 50%, #60a5fa 100%);
+    border-radius: 16px;
+    box-shadow: 0 8px 24px var(--accent-glow), 0 0 0 1px rgba(255, 255, 255, 0.2) inset;
+  }
+  .app-logo svg { width: 34px; height: 34px; fill: white; }
   .badge {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: rgba(47, 129, 247, 0.15);
-    color: #58a6ff;
-    padding: 6px 14px;
+    background: rgba(37, 99, 235, 0.15);
+    color: var(--accent-light);
+    padding: 5px 12px;
     border-radius: 999px;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
-    margin-bottom: 12px;
-    border: 1px solid rgba(47, 129, 247, 0.3);
+    margin-bottom: 8px;
+    border: 1px solid rgba(59, 130, 246, 0.3);
   }
   .pulse {
     width: 8px;
     height: 8px;
-    background: #3fb950;
+    background: #10b981;
     border-radius: 50%;
-    box-shadow: 0 0 10px #3fb950;
+    box-shadow: 0 0 10px #10b981;
+    animation: pulseAnim 2s infinite ease-in-out;
   }
-  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 6px; }
-  p { font-size: 14px; color: var(--muted); line-height: 1.4; }
+  @keyframes pulseAnim {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.2); }
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: var(--muted); line-height: 1.4; }
+
+  /* Card */
   .card {
     background: var(--card);
-    border: 1px solid var(--border);
-    backdrop-filter: blur(20px);
+    border: 1px solid var(--card-border);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
     border-radius: 20px;
     padding: 22px;
     width: 100%;
-    max-width: 440px;
+    max-width: 460px;
     margin-bottom: 16px;
-    box-shadow: 0 16px 36px rgba(0,0,0,0.4);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
   }
+
+  /* PIN Section */
   .pin-group {
     display: flex;
     gap: 8px;
     justify-content: center;
-    margin: 16px 0 20px;
+    margin: 18px 0 22px;
   }
   .pin-input {
     width: 46px;
     height: 56px;
-    border-radius: 12px;
-    border: 2px solid var(--border);
-    background: rgba(13, 17, 23, 0.7);
+    border-radius: 14px;
+    border: 2px solid var(--card-border);
+    background: rgba(7, 10, 19, 0.7);
     color: var(--ink);
-    font-size: 24px;
+    font-size: 26px;
     font-weight: 700;
     text-align: center;
     outline: none;
-    transition: all 0.2s;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .pin-input:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 12px var(--accent-glow);
+    border-color: var(--accent-light);
+    box-shadow: 0 0 14px var(--accent-glow);
+    background: rgba(37, 99, 235, 0.1);
   }
   .btn {
     width: 100%;
-    padding: 14px;
+    padding: 15px;
     border-radius: 14px;
     border: none;
-    background: var(--accent);
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
     color: white;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 4px 16px var(--accent-glow);
-    transition: opacity 0.2s;
+    box-shadow: 0 4px 18px var(--accent-glow);
+    transition: all 0.18s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
   }
-  .btn:active { opacity: 0.85; }
-  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn:active { transform: scale(0.98); opacity: 0.9; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--ink);
+    border: 1px solid var(--card-border);
+    box-shadow: none;
+    margin-top: 10px;
+  }
+  .btn-secondary:active { background: rgba(255, 255, 255, 0.12); }
+
+  /* Feature tags */
+  .chips-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 12px 0 16px;
+  }
+  .chip {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .chip-limit {
+    background: rgba(37, 99, 235, 0.12);
+    border-color: rgba(37, 99, 235, 0.3);
+    color: var(--accent-light);
+    font-weight: 600;
+  }
+
+  /* Upload Drop Zone */
   .drop-zone {
-    border: 2px dashed rgba(255, 255, 255, 0.2);
-    border-radius: 16px;
-    padding: 32px 16px;
+    border: 2px dashed rgba(59, 130, 246, 0.4);
+    border-radius: 18px;
+    padding: 28px 16px;
     text-align: center;
     cursor: pointer;
-    background: rgba(255, 255, 255, 0.02);
-    margin-top: 10px;
-    transition: all 0.2s;
+    background: rgba(37, 99, 235, 0.04);
+    transition: all 0.2s ease;
+    margin-bottom: 14px;
   }
-  .drop-zone:hover {
-    border-color: var(--accent);
-    background: rgba(47, 129, 247, 0.05);
+  .drop-zone:active, .drop-zone.dragover {
+    border-color: var(--accent-light);
+    background: rgba(37, 99, 235, 0.1);
+    transform: scale(0.99);
   }
-  .upload-icon {
-    font-size: 40px;
-    margin-bottom: 10px;
+  .drop-icons {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
   }
+  .icon-circle {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: rgba(37, 99, 235, 0.15);
+    border: 1px solid rgba(37, 99, 235, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent-light);
+  }
+  .drop-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+  .drop-hint {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+  .batch-badge {
+    display: inline-block;
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-top: 8px;
+  }
+
+  /* Progress Section */
+  .progress-box {
+    margin: 16px 0 10px;
+    padding: 14px;
+    background: rgba(7, 10, 19, 0.6);
+    border-radius: 14px;
+    border: 1px solid var(--card-border);
+  }
+  .progress-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    margin-bottom: 8px;
+  }
+  .progress-title {
+    font-weight: 600;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 250px;
+  }
+  .progress-pct {
+    font-weight: 700;
+    color: var(--accent-light);
+    font-family: ui-monospace, SFMono-Regular, monospace;
+  }
+  .progress-track {
+    width: 100%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    overflow: hidden;
+    position: relative;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #2563eb, #60a5fa);
+    border-radius: 999px;
+    transition: width 0.25s ease-out;
+  }
+
+  /* Toast Notification */
+  .toast {
+    position: fixed;
+    top: max(env(safe-area-inset-top), 20px);
+    left: 50%;
+    transform: translateX(-50%) translateY(-100px);
+    background: rgba(24, 30, 48, 0.96);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    color: #fef3c7;
+    padding: 12px 18px;
+    border-radius: 14px;
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(16px);
+    z-index: 9999;
+    max-width: 90%;
+    width: 380px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .toast.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+  .toast.success {
+    border-color: rgba(16, 185, 129, 0.4);
+    color: #d1fae5;
+  }
+
+  /* Preview Grid */
   .preview-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    margin-top: 16px;
+    gap: 8px;
+    margin-top: 14px;
+    max-height: 380px;
+    overflow-y: auto;
+    padding: 2px;
   }
-  .preview-item {
+  .preview-card {
     position: relative;
     aspect-ratio: 1;
-    border-radius: 10px;
+    border-radius: 12px;
     overflow: hidden;
-    background: #1c2128;
-    border: 1px solid var(--border);
+    background: #0d1321;
+    border: 1px solid var(--card-border);
   }
-  .preview-item img {
+  .preview-card img, .preview-card video {
     width: 100%;
     height: 100%;
     object-fit: cover;
   }
-  .status-tag {
+  .preview-type-badge {
     position: absolute;
-    bottom: 4px;
-    right: 4px;
-    background: rgba(0,0,0,0.7);
-    color: var(--success);
-    font-size: 10px;
+    top: 5px;
+    left: 5px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    font-size: 9px;
     font-weight: 700;
     padding: 2px 5px;
     border-radius: 4px;
+    text-transform: uppercase;
+    font-family: ui-monospace, monospace;
+    backdrop-filter: blur(4px);
   }
-  .progress-bar {
-    width: 100%;
-    height: 6px;
-    background: rgba(255,255,255,0.1);
-    border-radius: 3px;
-    overflow: hidden;
-    margin-top: 14px;
+  .preview-status {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    background: rgba(0, 0, 0, 0.75);
+    color: var(--success);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 5px;
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    gap: 3px;
   }
-  .progress-fill {
-    height: 100%;
-    width: 0%;
-    background: var(--accent);
-    transition: width 0.2s;
+  .preview-status.pending { color: #f59e0b; }
+  .preview-status.error { color: #ef4444; }
+
+  /* Device details strip */
+  .device-strip {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    border: 1px solid var(--card-border);
+    margin-bottom: 14px;
+    font-size: 12px;
   }
 </style>
 </head>
 <body>
 
+<!-- Toast -->
+<div id="toast" class="toast">
+  <span id="toast-icon">ℹ️</span>
+  <span id="toast-text">Notice message</span>
+</div>
+
+<!-- Header -->
 <div class="header">
+  <div class="app-logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" fill="white" fill-opacity="0.15" stroke="white"/>
+      <circle cx="8.5" cy="8.5" r="1.5" fill="white"/>
+      <polyline points="21 15 16 10 5 21" stroke="white"/>
+    </svg>
+  </div>
   <div class="badge"><span class="pulse"></span> Local Wi-Fi P2P Mesh</div>
-  <h1>Neural Gallery</h1>
-  <p>Air-gapped sync directly to your Mac. No cloud, zero telemetry.</p>
+  <h1>Neural Gallery Sync</h1>
+  <p class="subtitle">Air-gapped sync directly to your Mac. No cloud, zero compression.</p>
 </div>
 
+<!-- Pairing Screen -->
 <div class="card" id="pair-section">
-  <h2 style="font-size: 18px; margin-bottom: 4px;">Enter SAS Pairing PIN</h2>
-  <p>Type the 6-digit PIN displayed on your Mac's screen.</p>
+  <h2 style="font-size: 18px; margin-bottom: 4px; font-weight: 700;">Enter SAS Pairing PIN</h2>
+  <p class="subtitle">Type the 6-digit PIN displayed in the Neural Gallery Sync dialog on your Mac.</p>
+  
   <div class="pin-group">
-    <input type="tel" maxlength="1" class="pin-input" autofocus>
-    <input type="tel" maxlength="1" class="pin-input">
-    <input type="tel" maxlength="1" class="pin-input">
-    <input type="tel" maxlength="1" class="pin-input">
-    <input type="tel" maxlength="1" class="pin-input">
-    <input type="tel" maxlength="1" class="pin-input">
+    <input type="tel" maxlength="1" class="pin-input" inputmode="numeric" autocomplete="one-time-code" autofocus>
+    <input type="tel" maxlength="1" class="pin-input" inputmode="numeric">
+    <input type="tel" maxlength="1" class="pin-input" inputmode="numeric">
+    <input type="tel" maxlength="1" class="pin-input" inputmode="numeric">
+    <input type="tel" maxlength="1" class="pin-input" inputmode="numeric">
+    <input type="tel" maxlength="1" class="pin-input" inputmode="numeric">
   </div>
-  <button class="btn" id="btn-pair">Pair With Mac</button>
+  
+  <button class="btn" id="btn-pair">
+    <span>Pair With Mac</span>
+  </button>
 </div>
 
+<!-- Upload Screen -->
 <div class="card" id="upload-section" style="display: none;">
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-    <div>
-      <h2 style="font-size: 18px;">Upload Photos</h2>
-      <p>Select photos from your camera roll.</p>
+  <div class="device-strip">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span>
+      <span style="font-weight: 600; color: var(--ink);" id="mac-label">Mac Connected</span>
     </div>
-    <span class="badge" style="margin-bottom:0; background:rgba(63,185,80,0.15); color:#3fb950; border-color:rgba(63,185,80,0.3)">✓ Paired</span>
+    <span class="chip chip-limit" style="margin: 0;">Limit: 30 / batch</span>
   </div>
 
-  <input type="file" id="file-input" accept="image/*,video/*" multiple style="display: none;">
+  <div class="chips-container">
+    <span class="chip">📸 Photos (HEIC, RAW, JPEG, PNG, WebP)</span>
+    <span class="chip">🎥 Videos (4K MOV, MP4, ProRes)</span>
+    <span class="chip">⚡ Zero Compression</span>
+  </div>
+
+  <!-- Primary Photo & Video Picker (Native Gallery / Camera Roll where Done button is always enabled) -->
+  <input 
+    type="file" 
+    id="file-input" 
+    accept="image/*,video/*" 
+    multiple 
+    style="display: none;"
+  >
+
+  <!-- Secondary Files / Documents Picker (For loose camera RAW files from iCloud / Android Files) -->
+  <input 
+    type="file" 
+    id="file-input-files" 
+    multiple 
+    style="display: none;"
+  >
+
+  <!-- Interactive Dropzone -->
   <div class="drop-zone" id="drop-zone">
-    <div class="upload-icon">📷</div>
-    <p style="font-weight: 600; color: var(--ink);">Tap to select photos or videos</p>
-    <p style="font-size: 12px; margin-top: 4px;">Supports HEIC, JPEG, PNG, ProRAW, MP4</p>
+    <div class="drop-icons">
+      <div class="icon-circle">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+      </div>
+      <div class="icon-circle">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="23 7 16 12 23 17 23 7"/>
+          <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+        </svg>
+      </div>
+    </div>
+    <div class="drop-title">Select Photos & Videos</div>
+    <div class="drop-hint">Tap to open Camera Roll (Done button active)</div>
+    <span class="batch-badge">⚡ Batch Limit: Up to 30 items</span>
   </div>
 
-  <div class="progress-bar" id="progress-bar" style="display: none;">
-    <div class="progress-fill" id="progress-fill"></div>
-  </div>
-  <p id="upload-status" style="font-size: 13px; text-align: center; margin-top: 8px; display: none;"></p>
+  <div style="display: flex; flex-direction: column; gap: 8px;">
+    <button class="btn" id="btn-select-media" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <span>Choose from Photo Library</span>
+    </button>
 
+    <button class="btn btn-secondary" id="btn-select-files" type="button">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
+      <span>Browse Files / Camera RAW (DNG, CR2...)</span>
+    </button>
+  </div>
+
+  <!-- Progress Box -->
+  <div class="progress-box" id="progress-box" style="display: none;">
+    <div class="progress-meta">
+      <span class="progress-title" id="progress-status">Preparing upload...</span>
+      <span class="progress-pct" id="progress-pct">0%</span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-bar-fill" id="progress-bar-fill"></div>
+    </div>
+  </div>
+
+  <!-- Preview Grid -->
   <div class="preview-grid" id="preview-grid"></div>
+
+  <!-- Action buttons shown after upload -->
+  <div id="post-upload-actions" style="display: none; margin-top: 14px;">
+    <button class="btn btn-secondary" id="btn-upload-more">
+      <span>Upload Another Batch (Up to 30)</span>
+    </button>
+  </div>
 </div>
 
 <script>
@@ -617,51 +943,97 @@ const btnPair = document.querySelector("#btn-pair");
 const pairSection = document.querySelector("#pair-section");
 const uploadSection = document.querySelector("#upload-section");
 const fileInput = document.querySelector("#file-input");
+const fileInputFiles = document.querySelector("#file-input-files");
 const dropZone = document.querySelector("#drop-zone");
+const btnSelectMedia = document.querySelector("#btn-select-media");
+const btnSelectFiles = document.querySelector("#btn-select-files");
 const previewGrid = document.querySelector("#preview-grid");
-const progressBar = document.querySelector("#progress-bar");
-const progressFill = document.querySelector("#progress-fill");
-const uploadStatus = document.querySelector("#upload-status");
+const progressBox = document.querySelector("#progress-box");
+const progressBarFill = document.querySelector("#progress-bar-fill");
+const progressStatus = document.querySelector("#progress-status");
+const progressPct = document.querySelector("#progress-pct");
+const postUploadActions = document.querySelector("#post-upload-actions");
+const btnUploadMore = document.querySelector("#btn-upload-more");
+const toast = document.querySelector("#toast");
+const toastIcon = document.querySelector("#toast-icon");
+const toastText = document.querySelector("#toast-text");
 
+let toastTimer = null;
+function showToast(message, isSuccess = false, duration = 4000) {
+  if (toastTimer) clearTimeout(toastTimer);
+  toastIcon.textContent = isSuccess ? "✅" : "⚠️";
+  toastText.textContent = message;
+  toast.className = isSuccess ? "toast success show" : "toast show";
+  if (navigator.vibrate) navigator.vibrate([20]);
+  toastTimer = setTimeout(() => {
+    toast.className = "toast";
+  }, duration);
+}
+
+// PIN inputs navigation & paste support
 pinInputs.forEach((input, index) => {
   input.addEventListener("input", (e) => {
-    if (e.target.value.length === 1 && index < pinInputs.length - 1) {
-      pinInputs[index + 1].focus();
+    if (e.target.value.length >= 1) {
+      e.target.value = e.target.value.slice(-1);
+      if (index < pinInputs.length - 1) {
+        pinInputs[index + 1].focus();
+      } else {
+        // Auto-submit when 6th digit entered
+        setTimeout(() => btnPair.click(), 100);
+      }
     }
   });
+
   input.addEventListener("keydown", (e) => {
     if (e.key === "Backspace" && !e.target.value && index > 0) {
       pinInputs[index - 1].focus();
     }
   });
+
+  input.addEventListener("paste", (e) => {
+    e.preventDefault();
+    const pasted = (e.clipboardData || window.clipboardData).getData("text").replace(/\\D/g, "");
+    if (pasted.length) {
+      pasted.split("").slice(0, 6).forEach((char, idx) => {
+        if (pinInputs[idx]) pinInputs[idx].value = char;
+      });
+      if (pasted.length >= 6) {
+        setTimeout(() => btnPair.click(), 100);
+      } else if (pinInputs[pasted.length]) {
+        pinInputs[pasted.length].focus();
+      }
+    }
+  });
 });
 
 function getPin() {
-  return Array.from(pinInputs).map(i => i.value).join("");
+  return Array.from(pinInputs).map(i => i.value.trim()).join("");
 }
 
 function getDeviceInfo() {
   let model = "Mobile Device";
-  if (/iPhone/.test(navigator.userAgent)) model = "iPhone";
-  else if (/iPad/.test(navigator.userAgent)) model = "iPad";
-  else if (/Android/.test(navigator.userAgent)) model = "Android Phone";
+  const ua = navigator.userAgent;
+  if (/iPhone/.test(ua)) model = "iPhone";
+  else if (/iPad/.test(ua)) model = "iPad";
+  else if (/Android/.test(ua)) model = "Android Device";
 
   let id = localStorage.getItem("neural_gallery_device_id");
   if (!id) {
-    id = "dev-" + Math.random().toString(36).substring(2, 10);
+    id = "dev-" + Math.random().toString(36).substring(2, 11);
     localStorage.setItem("neural_gallery_device_id", id);
   }
   return { id, name: model, model };
 }
 
+// Pair logic
 btnPair.addEventListener("click", async () => {
   const pin = getPin();
   if (pin.length !== 6) {
-    alert("Please enter the full 6-digit PIN");
+    showToast("Please enter all 6 digits of the PIN.");
     return;
   }
   btnPair.disabled = true;
-  btnPair.textContent = "Verifying...";
+  btnPair.innerHTML = "<span>Verifying PIN...</span>";
   try {
     const dev = getDeviceInfo();
     const res = await fetch("/api/sync/pair", {
@@ -673,74 +1045,178 @@ btnPair.addEventListener("click", async () => {
     if (data.success || data.paired) {
       pairSection.style.display = "none";
       uploadSection.style.display = "block";
+      showToast("Successfully paired with Mac!", true);
     } else {
-      alert(data.error || "Pairing failed. Check PIN on your Mac.");
+      showToast(data.error || "Pairing failed. Check PIN on your Mac.");
       btnPair.disabled = false;
-      btnPair.textContent = "Pair With Mac";
+      btnPair.innerHTML = "<span>Pair With Mac</span>";
     }
   } catch (err) {
-    alert("Failed to connect to Mac over local Wi-Fi.");
+    showToast("Connection to Mac failed over Wi-Fi.");
     btnPair.disabled = false;
-    btnPair.textContent = "Pair With Mac";
+    btnPair.innerHTML = "<span>Pair With Mac</span>";
   }
 });
 
-// Auto-pair seamlessly if opened via QR Code scan with ?pin= parameter
+// Auto-pair via QR code URL query ?pin=XXXXXX
 const urlParams = new URLSearchParams(window.location.search);
-const autoPin = (urlParams.get("pin") || "").replace(/\s+/g, "").trim();
+const autoPin = (urlParams.get("pin") || "").replace(/\\s+/g, "").trim();
 if (autoPin.length === 6) {
   autoPin.split("").forEach((digit, idx) => {
     if (pinInputs[idx]) pinInputs[idx].value = digit;
   });
-  setTimeout(() => {
-    btnPair.click();
-  }, 150);
+  setTimeout(() => { btnPair.click(); }, 150);
 }
 
+// File triggers
 dropZone.addEventListener("click", () => fileInput.click());
+btnSelectMedia.addEventListener("click", () => fileInput.click());
+btnSelectFiles.addEventListener("click", () => fileInputFiles.click());
+btnUploadMore.addEventListener("click", () => fileInput.click());
 
-fileInput.addEventListener("change", async (e) => {
-  const files = Array.from(e.target.files);
-  if (!files.length) return;
+// Drag & drop highlight
+["dragenter", "dragover"].forEach(evt => {
+  dropZone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropZone.classList.add("dragover");
+  });
+});
+["dragleave", "drop"].forEach(evt => {
+  dropZone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropZone.classList.remove("dragover");
+  });
+});
+dropZone.addEventListener("drop", (e) => {
+  if (e.dataTransfer && e.dataTransfer.files.length) {
+    handleUploadBatch(e.dataTransfer.files);
+  }
+});
 
-  progressBar.style.display = "block";
-  uploadStatus.style.display = "block";
+// Format byte size
+function formatBytes(bytes) {
+  if (!bytes) return "0 B";
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / 1048576).toFixed(1) + " MB";
+}
 
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    uploadStatus.textContent = `Uploading ${i + 1} of ${files.length}: ${file.name}`;
-    progressFill.style.width = `${Math.round(((i) / files.length) * 100)}%`;
+fileInput.addEventListener("change", (e) => {
+  if (e.target.files && e.target.files.length) {
+    handleUploadBatch(e.target.files);
+  }
+  fileInput.value = "";
+});
 
+fileInputFiles.addEventListener("change", (e) => {
+  if (e.target.files && e.target.files.length) {
+    handleUploadBatch(e.target.files);
+  }
+  fileInputFiles.value = "";
+});
+
+// Unified media upload handler enforcing 30-item batch limit
+async function handleUploadBatch(selectedFileList) {
+  let allFiles = Array.from(selectedFileList || []);
+  if (!allFiles.length) return;
+
+  // Enforce batch limit: maximum 30 in one go
+  const BATCH_LIMIT = 30;
+  let filesToUpload = allFiles;
+  if (allFiles.length > BATCH_LIMIT) {
+    showToast(`⚠️ Batch limit applied: Uploading first ${BATCH_LIMIT} of ${allFiles.length} items.`, false, 5000);
+    filesToUpload = allFiles.slice(0, BATCH_LIMIT);
+  }
+
+  const total = filesToUpload.length;
+  progressBox.style.display = "block";
+  postUploadActions.style.display = "none";
+  btnSelectMedia.disabled = true;
+  btnSelectFiles.disabled = true;
+
+  let successCount = 0;
+
+  for (let i = 0; i < total; i++) {
+    const file = filesToUpload[i];
+    const isVideo = file.type.startsWith("video/") || /\\.(mov|mp4|m4v|webm|mkv|avi|3gp)$/i.test(file.name);
+    const ext = file.name.split(".").pop().toUpperCase() || (isVideo ? "MOV" : "IMG");
+
+    // Create preview placeholder card
+    const card = document.createElement("div");
+    card.className = "preview-card";
+
+    // Media element
+    const objectUrl = URL.createObjectURL(file);
+    if (isVideo) {
+      const vid = document.createElement("video");
+      vid.src = objectUrl;
+      vid.muted = true;
+      vid.playsInline = true;
+      vid.preload = "metadata";
+      card.appendChild(vid);
+    } else {
+      const img = document.createElement("img");
+      img.src = objectUrl;
+      img.alt = file.name;
+      card.appendChild(img);
+    }
+
+    // Type badge
+    const typeBadge = document.createElement("div");
+    typeBadge.className = "preview-type-badge";
+    typeBadge.textContent = isVideo ? `▶ ${ext}` : ext;
+    card.appendChild(typeBadge);
+
+    // Status tag
+    const statusTag = document.createElement("div");
+    statusTag.className = "preview-status pending";
+    statusTag.textContent = "Syncing...";
+    card.appendChild(statusTag);
+
+    previewGrid.prepend(card);
+
+    // Update progress UI
+    const currentPercent = Math.round((i / total) * 100);
+    progressBarFill.style.width = `${currentPercent}%`;
+    progressPct.textContent = `${currentPercent}%`;
+    progressStatus.textContent = `Syncing (${i + 1}/${total}): ${file.name} (${formatBytes(file.size)})`;
+
+    // Upload to server
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("file", file, file.name);
 
     try {
       const res = await fetch("/api/sync/upload", {
         method: "POST",
+        headers: { "X-Filename": encodeURIComponent(file.name) },
         body: formData
       });
       const data = await res.json();
-      if (data.success) {
-        const item = document.createElement("div");
-        item.className = "preview-item";
-        const img = document.createElement("img");
-        img.src = URL.createObjectURL(file);
-        item.appendChild(img);
-        const tag = document.createElement("div");
-        tag.className = "status-tag";
-        tag.textContent = "Synced";
-        item.appendChild(tag);
-        previewGrid.prepend(item);
+      if (data.success || data.file_id) {
+        statusTag.className = "preview-status";
+        statusTag.textContent = "✓ Synced";
+        successCount++;
+      } else {
+        statusTag.className = "preview-status error";
+        statusTag.textContent = "✕ Error";
       }
     } catch (err) {
-      console.error(err);
+      console.error("Upload error:", err);
+      statusTag.className = "preview-status error";
+      statusTag.textContent = "✕ Failed";
     }
   }
 
-  progressFill.style.width = "100%";
-  uploadStatus.textContent = `Successfully synced ${files.length} photos to Mac!`;
-  setTimeout(() => { progressBar.style.display = "none"; }, 1500);
-});
+  // Finished batch
+  progressBarFill.style.width = "100%";
+  progressPct.textContent = "100%";
+  progressStatus.textContent = `Batch complete: Synced ${successCount} of ${total} items directly to Mac!`;
+  showToast(`🎉 Synced ${successCount} items to your Mac!`, true, 4000);
+
+  btnSelectMedia.disabled = false;
+  btnSelectFiles.disabled = false;
+  postUploadActions.style.display = "block";
+}
 </script>
 </body>
 </html>

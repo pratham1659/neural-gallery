@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { api } from "./services/api";
 import {
   ActiveView,
@@ -91,7 +91,8 @@ export const App: React.FC = () => {
   });
 
   // Modal & Responsive State
-  const [isInspectorOpen, setIsInspectorOpen] = useState(true);
+  const [isInspectorOpen, setIsInspectorOpen] = useState(false);
+  const inspectorRef = useRef<HTMLDivElement>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSyncOpen, setIsSyncOpen] = useState(false);
   const [isLocked, setIsLocked] = useState<boolean>(() => {
@@ -122,8 +123,124 @@ export const App: React.FC = () => {
   const [isEnlargedOpen, setIsEnlargedOpen] = useState(false);
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<number>>(new Set());
   const [undoToast, setUndoToast] = useState<{ message: string; ids: number[] } | null>(null);
+  const [importNotification, setImportNotification] = useState<{ count: number; message: string } | null>(null);
   const [isEmptyTrashConfirmOpen, setIsEmptyTrashConfirmOpen] = useState(false);
   const [folderToDelete, setFolderToDelete] = useState<FolderItem | null>(null);
+
+  const lastSyncBatchIdRef = useRef<string | null>(null);
+  const lastTotalSyncedRef = useRef<number | null>(null);
+  const lastImportedCountRef = useRef<number | null>(null);
+
+  // Auto-dismiss import notification after 6 seconds
+  useEffect(() => {
+    if (!importNotification) return;
+    const timer = setTimeout(() => {
+      setImportNotification(null);
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [importNotification]);
+
+  // Auto-close info sidebar when user clicks outside of any photo or outside the sidebar
+  useEffect(() => {
+    if (!isInspectorOpen) return;
+
+    const handlePointerDown = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+
+      // 1. If clicked inside the Inspector Sidebar itself, keep open
+      if (inspectorRef.current && inspectorRef.current.contains(target)) {
+        return;
+      }
+
+      // 2. If clicked on a photo item or its interactive elements, let onPhotoClick handle it
+      if (target.closest("[data-photo-item]")) {
+        return;
+      }
+
+      // 3. If clicked inside modal/dialog overlays (e.g. EnlargedPhoto, SyncModal, Delete Confirm), ignore
+      if (
+        target.closest("[role='dialog']") ||
+        target.closest(".modal-backdrop") ||
+        target.closest(".fixed.inset-0.z-50")
+      ) {
+        return;
+      }
+
+      // 4. Clicked outside: close info sidebar and clear photo selection
+      setIsInspectorOpen(false);
+      setSelectedPhotoIds(new Set());
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [isInspectorOpen]);
+
+  // Real-time Background Polling for newly imported photos (from phone Wi-Fi sync or folder ingest)
+  useEffect(() => {
+    let isMounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const [statsData, syncData] = await Promise.all([
+          api.getStats(),
+          api.getSyncStatus(),
+        ]);
+        if (!isMounted) return;
+
+        const currentTotalSynced = syncData.last_sync?.total_synced ?? 0;
+        const currentBatchId = syncData.last_sync?.batch_id ?? null;
+        const currentBatchCount = syncData.last_sync?.count ?? 0;
+        const currentImported = statsData.imports ?? 0;
+
+        // Baseline initialization
+        if (lastTotalSyncedRef.current === null) {
+          lastTotalSyncedRef.current = currentTotalSynced;
+          lastSyncBatchIdRef.current = currentBatchId;
+          lastImportedCountRef.current = currentImported;
+          return;
+        }
+
+        const prevTotal = lastTotalSyncedRef.current;
+        const prevImported = lastImportedCountRef.current ?? 0;
+
+        const hasNewSync =
+          currentTotalSynced > prevTotal ||
+          (currentBatchId && currentBatchId !== lastSyncBatchIdRef.current);
+        const hasNewImports = currentImported > prevImported;
+
+        if (hasNewSync || hasNewImports) {
+          const syncedCount = Math.max(
+            currentTotalSynced - prevTotal,
+            currentImported - prevImported,
+            currentBatchCount,
+            1
+          );
+
+          lastTotalSyncedRef.current = currentTotalSynced;
+          lastSyncBatchIdRef.current = currentBatchId;
+          lastImportedCountRef.current = currentImported;
+
+          // Immediately refresh photos, stats & category data in real-time
+          refreshData();
+
+          // Show Toast Notification
+          setImportNotification({
+            count: syncedCount,
+            message: `${syncedCount} new photo${syncedCount > 1 ? "s" : ""} synced directly to Imports.`,
+          });
+        }
+      } catch {
+        // Silently ignore background polling errors
+      }
+    }, 1500);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [currentCategory, sortOrder, searchQuery]);
 
   // Load Initial Data
   const refreshData = async () => {
@@ -270,6 +387,14 @@ export const App: React.FC = () => {
               setIsEnlargedOpen(true);
             }
           }
+          // Escape: Clear selection and close sidebars if not selected
+          else if (e.key === "Escape") {
+            if (selectedPhotoIds.size > 0 || isInspectorOpen) {
+              e.preventDefault();
+              setSelectedPhotoIds(new Set());
+              setIsInspectorOpen(false);
+            }
+          }
           // Rapid Triage shortcuts: K (Keep), N (Trash)
           else if (selectedPhoto) {
             if (e.key.toLowerCase() === "k") {
@@ -300,6 +425,8 @@ export const App: React.FC = () => {
   // Selection Handlers (Command/Ctrl + Click, Shift + Click for range, Single Click)
   const handlePhotoClick = (photo: PhotoItem, e: React.MouseEvent) => {
     setSelectedPhoto(photo);
+    // When user clicks on any photo as select photo, info sidebar automatically shows up
+    setIsInspectorOpen(true);
 
     if (e.shiftKey) {
       // Range selection with Shift (like Google Photos / Apple Photos)
@@ -334,8 +461,13 @@ export const App: React.FC = () => {
         const next = new Set(prev);
         if (next.has(photo.id)) {
           next.delete(photo.id);
+          // If not selected, close the info sidebar
+          if (next.size === 0) {
+            setIsInspectorOpen(false);
+          }
         } else {
           next.add(photo.id);
+          setIsInspectorOpen(true);
         }
         return next;
       });
@@ -347,6 +479,11 @@ export const App: React.FC = () => {
   };
 
   const handleToggleSelectPhoto = (id: number, e?: React.MouseEvent) => {
+    const target = photos.find((p) => p.id === id);
+    if (target) {
+      setSelectedPhoto(target);
+    }
+
     if (e && e.shiftKey) {
       const anchorId = anchorPhotoId ?? selectedPhoto?.id;
       const fromIdx = anchorId ? photos.findIndex((p) => p.id === anchorId) : -1;
@@ -361,6 +498,7 @@ export const App: React.FC = () => {
           rangeIds.forEach((rid) => next.add(rid));
           return next;
         });
+        setIsInspectorOpen(true);
         return;
       }
     }
@@ -370,8 +508,13 @@ export const App: React.FC = () => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
+        // If not selected, close info sidebar
+        if (next.size === 0) {
+          setIsInspectorOpen(false);
+        }
       } else {
         next.add(id);
+        setIsInspectorOpen(true);
       }
       return next;
     });
@@ -383,8 +526,14 @@ export const App: React.FC = () => {
       const next = new Set(prev);
       if (allSelected) {
         sectionIds.forEach((id) => next.delete(id));
+        if (next.size === 0) {
+          setIsInspectorOpen(false);
+        }
       } else {
         sectionIds.forEach((id) => next.add(id));
+        setIsInspectorOpen(true);
+        const first = photos.find((p) => sectionIds.includes(p.id));
+        if (first) setSelectedPhoto(first);
       }
       return next;
     });
@@ -392,10 +541,19 @@ export const App: React.FC = () => {
 
   const handleSelectAll = () => {
     setSelectedPhotoIds(new Set(photos.map((p) => p.id)));
+    if (photos.length > 0) {
+      setIsInspectorOpen(true);
+      if (!selectedPhoto || !photos.some((p) => p.id === selectedPhoto.id)) {
+        setSelectedPhoto(photos[0]);
+      }
+    }
   };
 
   const handleClearSelection = () => {
     setSelectedPhotoIds(new Set());
+    // If not selected, close info sidebar
+    setIsInspectorOpen(false);
+    // Retains selectedPhoto as previous selection until new selection happens
   };
 
   // Real-time Favorite Toggle
@@ -600,6 +758,10 @@ export const App: React.FC = () => {
   };
 
   const handleKeepPhoto = async (id: number) => {
+    if (currentCategory === "imports") {
+      await handleSaveSelectedImports([id]);
+      return;
+    }
     // Advance to next photo after action
     const currentIndex = photos.findIndex((p) => p.id === id);
     if (currentIndex < photos.length - 1) {
@@ -656,6 +818,33 @@ export const App: React.FC = () => {
       message: `${ids.length} ${ids.length === 1 ? "photo" : "photos"} moved to Trash`,
       ids,
     });
+  };
+
+  // Save selected imported photos into library with auto-sorting
+  const handleSaveSelectedImports = async (specificIds?: number[]) => {
+    const idsToSave = specificIds || Array.from(selectedPhotoIds);
+    if (idsToSave.length === 0) return;
+    try {
+      await api.saveImportedPhotos(idsToSave);
+      setPhotos((prev) => prev.filter((p) => !idsToSave.includes(p.id)));
+      setSelectedPhotoIds((prev) => {
+        const next = new Set(prev);
+        idsToSave.forEach((id) => next.delete(id));
+        return next;
+      });
+      if (selectedPhoto && idsToSave.includes(selectedPhoto.id)) {
+        const remaining = photos.filter((p) => !idsToSave.includes(p.id));
+        setSelectedPhoto(remaining[0] || null);
+      }
+      const newStats = await api.getStats();
+      setStats(newStats);
+      setUndoToast({
+        message: `${idsToSave.length} ${idsToSave.length === 1 ? "photo" : "photos"} saved & auto-sorted into library`,
+        ids: idsToSave,
+      });
+    } catch (err) {
+      console.error("Failed to save imported photos:", err);
+    }
   };
 
   // Put Back / Restore photos where they were deleted
@@ -840,6 +1029,8 @@ export const App: React.FC = () => {
         onUnhideSelected={handleBulkUnhide}
         isHiddenCategory={currentCategory === "hidden" || (currentCategory.startsWith("folder:") && folders.some(f => f.is_hidden && currentCategory === `folder:${f.id}`))}
         isTrashCategory={currentCategory === "trash"}
+        isImportCategory={currentCategory === "imports"}
+        onSaveSelectedImports={() => handleSaveSelectedImports()}
       />
 
       {/* Main Content Area: Sidebar + Views + Inspector */}
@@ -938,6 +1129,10 @@ export const App: React.FC = () => {
                   catalogStyle={catalogStyle}
                   sortOrder={sortOrder}
                   isTrashCategory={currentCategory === "trash"}
+                  isImportCategory={currentCategory === "imports"}
+                  onSaveImportPhoto={(id) => handleSaveSelectedImports([id])}
+                  onSaveAllImports={() => handleSaveSelectedImports(photos.map(p => p.id))}
+                  onTrashImportPhoto={(id) => handleTrashPhoto(id)}
                   onRestorePhoto={(id) => handleRestorePhotos([id])}
                   onEmptyTrash={() => setIsEmptyTrashConfirmOpen(true)}
                   onRestoreAll={handleRestoreAllTrash}
@@ -975,7 +1170,11 @@ export const App: React.FC = () => {
                   pins={mapPins}
                   onSelectPinPhoto={(photoId) => {
                     const found = photos.find((p) => p.id === photoId);
-                    if (found) setSelectedPhoto(found);
+                    if (found) {
+                      setSelectedPhoto(found);
+                      setSelectedPhotoIds(new Set([found.id]));
+                      setIsInspectorOpen(true);
+                    }
                   }}
                 />
               )}
@@ -991,14 +1190,18 @@ export const App: React.FC = () => {
           )}
         </main>
 
-        {/* Right Inspector Sidebar (slide-over drawer on < lg screens, column on >= lg) */}
+        {/* Right Inspector Sidebar (docked column on md+ below header like the left sidebar, slide-over below header on mobile) */}
         {isInspectorOpen && (
           <>
+            {/* Mobile backdrop below header */}
             <div
-              className="fixed inset-0 z-30 bg-black/35 backdrop-blur-[2px] lg:hidden animate-fadeIn"
+              className="fixed inset-0 top-14 z-30 bg-black/25 backdrop-blur-[1px] md:hidden animate-fadeIn"
               onClick={() => setIsInspectorOpen(false)}
             />
-            <div className="fixed inset-y-0 right-0 z-40 lg:relative lg:z-0 h-full shadow-2xl lg:shadow-none animate-slideLeft shrink-0">
+            <div
+              ref={inspectorRef}
+              className="fixed top-14 bottom-0 right-0 z-40 md:relative md:top-auto md:bottom-auto md:z-0 h-full shadow-2xl md:shadow-none animate-slideLeft shrink-0"
+            >
               <InspectorSidebar
                 photo={selectedPhoto}
                 onClose={() => setIsInspectorOpen(false)}
@@ -1021,7 +1224,10 @@ export const App: React.FC = () => {
         photo={selectedPhoto}
         photos={photos}
         onClose={() => setIsEnlargedOpen(false)}
-        onSelectPhoto={(photo) => setSelectedPhoto(photo)}
+        onSelectPhoto={(photo) => {
+          setSelectedPhoto(photo);
+          setSelectedPhotoIds(new Set([photo.id]));
+        }}
         onToggleFavorite={handleToggleFavorite}
         onKeepPhoto={handleKeepPhoto}
         onTrashPhoto={handleTrashPhoto}
@@ -1031,7 +1237,11 @@ export const App: React.FC = () => {
       <IndexFolderModal
         isOpen={isIndexFolderOpen}
         onClose={() => setIsIndexFolderOpen(false)}
-        onIndexComplete={refreshData}
+        onIndexComplete={() => {
+          refreshData();
+          setCurrentCategory("imports");
+          setActiveView("timeline");
+        }}
       />
 
       <SyncModal
@@ -1136,6 +1346,45 @@ export const App: React.FC = () => {
           <button
             onClick={() => setUndoToast(null)}
             className="text-white/60 hover:text-white text-xs p-1"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Real-time Import Sync Notification */}
+      {importNotification && (
+        <div className="fixed bottom-6 left-6 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl bg-[var(--card)]/95 text-[var(--text-main)] backdrop-blur-xl border border-emerald-500/40 shadow-2xl shadow-emerald-500/10 animate-slideUp">
+          <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-500 text-base font-bold">
+            📥
+          </div>
+          <div>
+            <div className="text-xs font-bold text-[var(--text-main)] flex items-center gap-1.5">
+              <span>{importNotification.count} New Photo{importNotification.count > 1 ? "s" : ""} Synced</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-500 font-semibold">
+                Imports
+              </span>
+            </div>
+            <div className="text-[11px] text-[var(--text-muted)]">
+              {importNotification.message}
+            </div>
+          </div>
+          {currentCategory !== "imports" && (
+            <button
+              onClick={() => {
+                setCurrentCategory("imports");
+                setActiveView("timeline");
+                setImportNotification(null);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition-all ml-1 flex items-center gap-1 cursor-pointer"
+            >
+              <span>View</span>
+              <span>→</span>
+            </button>
+          )}
+          <button
+            onClick={() => setImportNotification(null)}
+            className="p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--button-hover)] transition-colors ml-1 text-xs cursor-pointer"
           >
             ✕
           </button>

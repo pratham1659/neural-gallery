@@ -212,6 +212,7 @@ def get_photo_detail(connection: sqlite3.Connection, file_id: int) -> dict:
         "is_live_photo": bool(row["is_live_photo"]),
         "is_hidden": bool(row["is_hidden"]),
         "is_trashed": bool(row["is_trashed"]),
+        "is_imported": bool(row["is_imported"]),
         "camera_make": row["camera_make"] or "",
         "camera_model": row["camera_model"] or "",
         "lens_model": row["lens_model"] or "",
@@ -242,3 +243,78 @@ def _unique_target(folder: Path, name: str, file_id: int) -> Path:
     stem = Path(name).stem
     suffix = Path(name).suffix
     return folder / f"{stem}-{file_id}{suffix}"
+
+
+def auto_sort_imported_photo(connection: sqlite3.Connection, file_id: int) -> str:
+    """
+    Mark an imported photo as saved (is_imported=0, label='keep') and classify it
+    into its natural library category based on media attributes, optical metadata,
+    and face/OCR detections.
+    """
+    row = connection.execute("SELECT * FROM files WHERE id = ?", (file_id,)).fetchone()
+    if row is None:
+        raise ActionError("that photo is not in the index")
+
+    path_str = (row["path"] or "").lower()
+    cat = "all"
+
+    if row["is_screenshot"]:
+        if row["is_video"]:
+            cat = "screen-recordings"
+        else:
+            cat = "screenshots"
+    elif row["is_video"]:
+        if "slomo" in path_str or "slow" in path_str:
+            cat = "slomo"
+        elif "timelapse" in path_str or "time-lapse" in path_str:
+            cat = "timelapse"
+        elif "prores" in path_str or "quicktime" in (row["mime_type"] or "").lower():
+            cat = "prores"
+        else:
+            cat = "videos"
+    elif row["is_raw"]:
+        cat = "raw"
+    elif row["is_portrait"]:
+        cat = "portraits"
+    elif row["is_live_photo"]:
+        cat = "live-photos"
+    elif row["width"] and row["height"] and (float(row["width"]) / max(1.0, float(row["height"]))) >= 2.2:
+        cat = "panoramas"
+    elif row["is_document"]:
+        cat = "documents"
+    else:
+        has_ocr = connection.execute("SELECT 1 FROM asset_ocr WHERE file_id = ?", (file_id,)).fetchone()
+        if has_ocr:
+            cat = "documents"
+        else:
+            faces = connection.execute(
+                "SELECT is_pet FROM faces LEFT JOIN people ON people.person_key = faces.person_key WHERE file_id = ?",
+                (file_id,),
+            ).fetchall()
+            if any(f["is_pet"] for f in faces if f["is_pet"] is not None):
+                cat = "pets"
+            elif len(faces) == 1:
+                cat = "selfies"
+            elif len(faces) > 1:
+                cat = "people"
+            elif row["latitude"] is not None:
+                cat = "travel"
+
+    connection.execute(
+        "UPDATE files SET is_imported = 0, label = 'keep', category = ? WHERE id = ?",
+        (cat, file_id),
+    )
+    connection.commit()
+    return cat
+
+
+def save_imported_photos(connection: sqlite3.Connection, file_ids: list[int]) -> dict:
+    results = {}
+    for fid in file_ids:
+        try:
+            cat = auto_sort_imported_photo(connection, fid)
+            results[fid] = cat
+        except Exception:
+            pass
+    return {"saved": len(results), "categories": results}
+

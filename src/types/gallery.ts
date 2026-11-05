@@ -66,6 +66,7 @@ export interface PhotoItem {
   is_panorama: boolean;
   is_selfie: boolean;
   is_document: boolean;
+  is_imported?: boolean;
   is_hidden: boolean;
   is_trashed: boolean;
   quality_score?: number;
@@ -179,6 +180,13 @@ export interface SyncStatus {
   pwa_url_hostname?: string;
   pwa_url_tunnel?: string | null;
   devices: SyncDevice[];
+  last_sync?: {
+    batch_id: string;
+    count: number;
+    timestamp: number;
+    files: string[];
+    total_synced: number;
+  } | null;
 }
 
 export interface FolderPreset {

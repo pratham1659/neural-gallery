@@ -1,6 +1,7 @@
 """Localhost review page. It can label photos. It cannot delete them."""
 
 import json
+import os
 import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -13,10 +14,12 @@ from PIL import Image, ImageOps
 from neural_gallery.access import allowed_file
 from neural_gallery.actions import (
     ActionError,
+    auto_sort_imported_photo,
     get_photo_detail,
     mark_trashed,
     move_indexed,
     reveal,
+    save_imported_photos,
     set_category,
     toggle_favorite,
     toggle_hidden,
@@ -841,24 +844,24 @@ def _stats(connection) -> dict:
         return int(connection.execute(sql).fetchone()[0])
 
     return {
-        "total": count("SELECT COUNT(*) FROM files WHERE is_trashed = 0"),
-        "unlabeled": count("SELECT COUNT(*) FROM files WHERE label IS NULL AND is_trashed = 0"),
-        "favorites": count("SELECT COUNT(*) FROM files WHERE is_favorite = 1 AND is_trashed = 0"),
-        "screenshots": count("SELECT COUNT(*) FROM files WHERE is_screenshot = 1 AND is_trashed = 0"),
-        "videos": count("SELECT COUNT(*) FROM files WHERE is_video = 1 AND is_trashed = 0"),
-        "raw": count("SELECT COUNT(*) FROM files WHERE is_raw = 1 AND is_trashed = 0"),
-        "portraits": count("SELECT COUNT(*) FROM files WHERE is_portrait = 1 AND is_trashed = 0"),
-        "live_photos": count("SELECT COUNT(*) FROM files WHERE is_live_photo = 1 AND is_trashed = 0"),
+        "total": count("SELECT COUNT(*) FROM files WHERE is_imported = 0 AND is_trashed = 0 AND is_hidden = 0"),
+        "unlabeled": count("SELECT COUNT(*) FROM files WHERE label IS NULL AND is_imported = 0 AND is_trashed = 0"),
+        "favorites": count("SELECT COUNT(*) FROM files WHERE is_favorite = 1 AND is_imported = 0 AND is_trashed = 0"),
+        "screenshots": count("SELECT COUNT(*) FROM files WHERE is_screenshot = 1 AND is_imported = 0 AND is_trashed = 0"),
+        "videos": count("SELECT COUNT(*) FROM files WHERE is_video = 1 AND is_imported = 0 AND is_trashed = 0"),
+        "raw": count("SELECT COUNT(*) FROM files WHERE is_raw = 1 AND is_imported = 0 AND is_trashed = 0"),
+        "portraits": count("SELECT COUNT(*) FROM files WHERE is_portrait = 1 AND is_imported = 0 AND is_trashed = 0"),
+        "live_photos": count("SELECT COUNT(*) FROM files WHERE is_live_photo = 1 AND is_imported = 0 AND is_trashed = 0"),
         "hidden": count("SELECT COUNT(*) FROM files WHERE is_hidden = 1 AND is_trashed = 0"),
         "trashed": count("SELECT COUNT(*) FROM files WHERE is_trashed = 1"),
-        "geocoded": count("SELECT COUNT(*) FROM files WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND is_trashed = 0"),
-        "duplicate_groups": count("SELECT COUNT(DISTINCT group_key) FROM dup_groups"),
-        "faces": count("SELECT COUNT(*) FROM faces"),
+        "geocoded": count("SELECT COUNT(*) FROM files WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND is_imported = 0 AND is_trashed = 0"),
+        "duplicate_groups": count("SELECT COUNT(DISTINCT group_key) FROM dup_groups WHERE file_id IN (SELECT id FROM files WHERE is_imported = 0)"),
+        "faces": count("SELECT COUNT(*) FROM faces WHERE file_id IN (SELECT id FROM files WHERE is_imported = 0)"),
         "people": count(
             """
             SELECT COUNT(*) FROM (
                 SELECT person_key FROM faces
-                WHERE person_key IS NOT NULL
+                WHERE person_key IS NOT NULL AND file_id IN (SELECT id FROM files WHERE is_imported = 0)
                 GROUP BY person_key HAVING COUNT(*) >= 1
             )
             """
@@ -868,22 +871,22 @@ def _stats(connection) -> dict:
             """
             SELECT COUNT(*) FROM faces
             LEFT JOIN people ON people.person_key = faces.person_key
-            WHERE (people.name IS NULL OR people.name = '')
+            WHERE (people.name IS NULL OR people.name = '') AND faces.file_id IN (SELECT id FROM files WHERE is_imported = 0)
             """
         ),
-        "keep": count("SELECT COUNT(*) FROM files WHERE label = 'keep' AND is_trashed = 0"),
-        "noise": count("SELECT COUNT(*) FROM files WHERE label = 'noise' AND is_trashed = 0"),
-        "panoramas": count("SELECT COUNT(*) FROM files WHERE ((width * 1.0 / NULLIF(height, 0)) >= 2.2 OR is_panorama = 1) AND is_trashed = 0"),
-        "documents": count("SELECT COUNT(*) FROM files WHERE (id IN (SELECT file_id FROM asset_ocr) OR category = 'document' OR is_document = 1) AND is_trashed = 0"),
+        "keep": count("SELECT COUNT(*) FROM files WHERE label = 'keep' AND is_imported = 0 AND is_trashed = 0"),
+        "noise": count("SELECT COUNT(*) FROM files WHERE label = 'noise' AND is_imported = 0 AND is_trashed = 0"),
+        "panoramas": count("SELECT COUNT(*) FROM files WHERE ((width * 1.0 / NULLIF(height, 0)) >= 2.2 OR is_panorama = 1) AND is_imported = 0 AND is_trashed = 0"),
+        "documents": count("SELECT COUNT(*) FROM files WHERE (id IN (SELECT file_id FROM asset_ocr) OR category = 'document' OR is_document = 1) AND is_imported = 0 AND is_trashed = 0"),
         "shared_albums": count("SELECT COUNT(*) FROM shared_albums"),
-        "shared_with_you": count("SELECT COUNT(DISTINCT file_id) FROM shared_album_files"),
-        "partner_sharing": count("SELECT COUNT(*) FROM shared_album_files WHERE album_id IN (SELECT id FROM shared_albums WHERE name LIKE '%partner%')"),
-        "travel": count("SELECT COUNT(DISTINCT strftime('%Y-%m', COALESCE(captured_at, datetime(mtime, 'unixepoch')))) FROM files WHERE latitude IS NOT NULL AND is_trashed = 0"),
-        "imports": count("SELECT COUNT(*) FROM files WHERE is_trashed = 0"),
-        "prores": count("SELECT COUNT(*) FROM files WHERE is_video = 1 AND (path LIKE '%prores%' OR mime_type LIKE '%quicktime%') AND is_trashed = 0"),
-        "slomo": count("SELECT COUNT(*) FROM files WHERE is_video = 1 AND (path LIKE '%slomo%' OR path LIKE '%slow%') AND is_trashed = 0"),
-        "timelapse": count("SELECT COUNT(*) FROM files WHERE is_video = 1 AND (path LIKE '%timelapse%' OR path LIKE '%time-lapse%') AND is_trashed = 0"),
-        "screen_recordings": count("SELECT COUNT(*) FROM files WHERE is_video = 1 AND is_screenshot = 1 AND is_trashed = 0"),
+        "shared_with_you": count("SELECT COUNT(DISTINCT file_id) FROM shared_album_files WHERE file_id IN (SELECT id FROM files WHERE is_imported = 0)"),
+        "partner_sharing": count("SELECT COUNT(*) FROM shared_album_files WHERE album_id IN (SELECT id FROM shared_albums WHERE name LIKE '%partner%') AND file_id IN (SELECT id FROM files WHERE is_imported = 0)"),
+        "travel": count("SELECT COUNT(DISTINCT strftime('%Y-%m', COALESCE(captured_at, datetime(mtime, 'unixepoch')))) FROM files WHERE latitude IS NOT NULL AND is_imported = 0 AND is_trashed = 0"),
+        "imports": count("SELECT COUNT(*) FROM files WHERE is_imported = 1 AND is_trashed = 0"),
+        "prores": count("SELECT COUNT(*) FROM files WHERE is_video = 1 AND (path LIKE '%prores%' OR mime_type LIKE '%quicktime%') AND is_imported = 0 AND is_trashed = 0"),
+        "slomo": count("SELECT COUNT(*) FROM files WHERE is_video = 1 AND (path LIKE '%slomo%' OR path LIKE '%slow%') AND is_imported = 0 AND is_trashed = 0"),
+        "timelapse": count("SELECT COUNT(*) FROM files WHERE is_video = 1 AND (path LIKE '%timelapse%' OR path LIKE '%time-lapse%') AND is_imported = 0 AND is_trashed = 0"),
+        "screen_recordings": count("SELECT COUNT(*) FROM files WHERE is_video = 1 AND is_screenshot = 1 AND is_imported = 0 AND is_trashed = 0"),
     }
 
 
@@ -899,58 +902,60 @@ def query_photos(
     params: list = []
 
     cat = (category or "all").lower().strip()
-    if cat == "all":
-        where.append("is_trashed = 0 AND is_hidden = 0")
+    if cat == "imports":
+        where.append("is_imported = 1 AND is_trashed = 0")
+    elif cat == "all":
+        where.append("is_imported = 0 AND is_trashed = 0 AND is_hidden = 0")
     elif cat == "favorites":
-        where.append("is_favorite = 1 AND is_trashed = 0 AND is_hidden = 0")
+        where.append("is_favorite = 1 AND is_imported = 0 AND is_trashed = 0 AND is_hidden = 0")
     elif cat == "recents":
-        where.append("is_trashed = 0 AND is_hidden = 0")
+        where.append("is_imported = 0 AND is_trashed = 0 AND is_hidden = 0")
     elif cat == "videos":
-        where.append("is_video = 1 AND is_trashed = 0 AND is_hidden = 0")
+        where.append("is_video = 1 AND is_imported = 0 AND is_trashed = 0 AND is_hidden = 0")
     elif cat in ("slomo", "videos_slomo"):
-        where.append("is_video = 1 AND (path LIKE '%slomo%' OR path LIKE '%slow%') AND is_trashed = 0")
+        where.append("is_video = 1 AND (path LIKE '%slomo%' OR path LIKE '%slow%') AND is_imported = 0 AND is_trashed = 0")
     elif cat in ("timelapse", "videos_timelapse"):
-        where.append("is_video = 1 AND (path LIKE '%timelapse%' OR path LIKE '%time-lapse%') AND is_trashed = 0")
+        where.append("is_video = 1 AND (path LIKE '%timelapse%' OR path LIKE '%time-lapse%') AND is_imported = 0 AND is_trashed = 0")
     elif cat in ("screen-recordings", "videos_screen_recording"):
-        where.append("is_video = 1 AND is_screenshot = 1 AND is_trashed = 0")
+        where.append("is_video = 1 AND is_screenshot = 1 AND is_imported = 0 AND is_trashed = 0")
     elif cat == "screenshots":
-        where.append("is_screenshot = 1 AND is_trashed = 0 AND is_hidden = 0")
+        where.append("is_screenshot = 1 AND is_imported = 0 AND is_trashed = 0 AND is_hidden = 0")
     elif cat == "selfies":
-        where.append("id IN (SELECT file_id FROM faces GROUP BY file_id HAVING COUNT(*) = 1) AND is_trashed = 0")
+        where.append("id IN (SELECT file_id FROM faces GROUP BY file_id HAVING COUNT(*) = 1) AND is_imported = 0 AND is_trashed = 0")
     elif cat == "portraits":
-        where.append("is_portrait = 1 AND is_trashed = 0 AND is_hidden = 0")
+        where.append("is_portrait = 1 AND is_imported = 0 AND is_trashed = 0 AND is_hidden = 0")
     elif cat in ("live-photos", "live_photos"):
-        where.append("is_live_photo = 1 AND is_trashed = 0 AND is_hidden = 0")
+        where.append("is_live_photo = 1 AND is_imported = 0 AND is_trashed = 0 AND is_hidden = 0")
     elif cat == "raw":
-        where.append("is_raw = 1 AND is_trashed = 0 AND is_hidden = 0")
+        where.append("is_raw = 1 AND is_imported = 0 AND is_trashed = 0 AND is_hidden = 0")
     elif cat == "panoramas":
-        where.append("(width * 1.0 / NULLIF(height, 0)) >= 2.2 AND is_trashed = 0")
+        where.append("(width * 1.0 / NULLIF(height, 0)) >= 2.2 AND is_imported = 0 AND is_trashed = 0")
     elif cat == "documents":
-        where.append("(id IN (SELECT file_id FROM asset_ocr) OR category = 'document') AND is_trashed = 0")
+        where.append("(id IN (SELECT file_id FROM asset_ocr) OR category = 'document') AND is_imported = 0 AND is_trashed = 0")
     elif cat == "duplicates":
-        where.append("id IN (SELECT file_id FROM dup_groups) AND is_trashed = 0")
+        where.append("id IN (SELECT file_id FROM dup_groups) AND is_imported = 0 AND is_trashed = 0")
     elif cat in ("low-quality", "low_quality"):
-        where.append("(blur_score < 40.0 OR quality_score < 4.0) AND is_trashed = 0")
+        where.append("(blur_score < 40.0 OR quality_score < 4.0) AND is_imported = 0 AND is_trashed = 0")
     elif cat == "inbox":
-        where.append("label IS NULL AND is_trashed = 0")
+        where.append("label IS NULL AND is_imported = 0 AND is_trashed = 0")
     elif cat == "hidden":
         where.append("is_hidden = 1 AND is_trashed = 0")
     elif cat == "trash":
         where.append("is_trashed = 1")
     elif cat in ("shared-albums", "shared-with-you", "partner-sharing"):
-        where.append("id IN (SELECT file_id FROM shared_album_files) AND is_trashed = 0")
+        where.append("id IN (SELECT file_id FROM shared_album_files) AND is_imported = 0 AND is_trashed = 0")
     elif cat.startswith("folder:"):
         f_id = cat.split("folder:")[1]
         if f_id.isdigit():
-            where.append("id IN (SELECT file_id FROM shared_album_files WHERE album_id = ?) AND is_trashed = 0")
+            where.append("id IN (SELECT file_id FROM shared_album_files WHERE album_id = ?) AND is_imported = 0 AND is_trashed = 0")
             params.append(int(f_id))
     elif cat in ("pets", "people"):
         if cat == "pets":
-            where.append("id IN (SELECT file_id FROM faces JOIN people ON people.person_key = faces.person_key WHERE people.is_pet = 1) AND is_trashed = 0")
+            where.append("id IN (SELECT file_id FROM faces JOIN people ON people.person_key = faces.person_key WHERE people.is_pet = 1) AND is_imported = 0 AND is_trashed = 0")
         else:
-            where.append("id IN (SELECT file_id FROM faces) AND is_trashed = 0")
+            where.append("id IN (SELECT file_id FROM faces) AND is_imported = 0 AND is_trashed = 0")
     else:
-        where.append("category = ? AND is_trashed = 0 AND is_hidden = 0")
+        where.append("category = ? AND is_imported = 0 AND is_trashed = 0 AND is_hidden = 0")
         params.append(cat)
 
     if search and search.strip():
@@ -1019,6 +1024,7 @@ def query_photos(
             "is_live_photo": bool(row["is_live_photo"]),
             "is_hidden": bool(row["is_hidden"]),
             "is_trashed": bool(row["is_trashed"]),
+            "is_imported": bool(row["is_imported"]),
             "camera_make": row["camera_make"] or "",
             "camera_model": row["camera_model"] or "",
             "lens_model": row["lens_model"] or "",
@@ -1051,7 +1057,7 @@ def map_pins(connection) -> list[dict]:
                camera_make, camera_model, aperture_f_number, shutter_speed_seconds, iso_equivalent,
                is_favorite, captured_at, mtime
         FROM files
-        WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND is_trashed = 0
+        WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND is_trashed = 0 AND is_imported = 0
         ORDER BY id DESC
         LIMIT 5000
         """
@@ -1132,6 +1138,7 @@ def make_handler(db_path: Path):
             self.send_header("Access-Control-Allow-Origin", "*")
             self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
             self.send_header("Access-Control-Allow-Headers", "*")
+            self.send_header("Access-Control-Allow-Private-Network", "true")
             self.end_headers()
             if not getattr(self, "_is_head", False):
                 self.wfile.write(body)
@@ -1151,6 +1158,7 @@ def make_handler(db_path: Path):
             self.send_header("Access-Control-Allow-Origin", "*")
             self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
             self.send_header("Access-Control-Allow-Headers", "*")
+            self.send_header("Access-Control-Allow-Private-Network", "true")
             self.send_header("Access-Control-Max-Age", "86400")
             self.send_header("Content-Length", "0")
             self.end_headers()
@@ -1166,22 +1174,10 @@ def make_handler(db_path: Path):
                     self._send(200, asset_file.read_bytes(), content_type)
                     return
 
-            if parsed.path == "/":
+            if parsed.path in ("/", "/preview", "/preview.html"):
                 dist_index = root_dir / "dist" / "index.html"
                 if dist_index.is_file():
                     self._send(200, dist_index.read_bytes(), "text/html; charset=utf-8")
-                    return
-                preview_path = root_dir / "preview.html"
-                if preview_path.is_file():
-                    self._send(200, preview_path.read_bytes(), "text/html; charset=utf-8")
-                    return
-                self._send(200, PAGE.encode(), "text/html; charset=utf-8")
-                return
-
-            if parsed.path in ("/preview", "/preview.html"):
-                preview_path = root_dir / "preview.html"
-                if preview_path.is_file():
-                    self._send(200, preview_path.read_bytes(), "text/html; charset=utf-8")
                     return
                 self._send(200, PAGE.encode(), "text/html; charset=utf-8")
                 return
@@ -1439,11 +1435,14 @@ def make_handler(db_path: Path):
                     return
                 body = self.rfile.read(content_len)
                 ctype = self.headers.get("Content-Type", "")
-                filename = self.headers.get("X-Filename") or f"sync_photo_{int(time.time())}.jpg"
+                raw_fn_hdr = self.headers.get("X-Filename", "")
+                import urllib.parse
+                filename = urllib.parse.unquote(raw_fn_hdr) if raw_fn_hdr else f"sync_photo_{int(time.time())}.jpg"
                 file_bytes = body
                 if "multipart/form-data" in ctype and "boundary=" in ctype:
-                    boundary = ctype.split("boundary=")[1].strip()
-                    parts = body.split(b"--" + boundary.encode())
+                    raw_boundary = ctype.split("boundary=")[1].split(";")[0].strip('"\'; ')
+                    boundary_bytes = raw_boundary.encode("utf-8")
+                    parts = body.split(b"--" + boundary_bytes)
                     for part in parts:
                         if b"Content-Disposition" in part and b"filename=" in part:
                             hdr_end = part.find(b"\r\n\r\n")
@@ -1454,16 +1453,23 @@ def make_handler(db_path: Path):
                                         raw_fn = line.split("filename=")[1].strip('"\'; ')
                                         if raw_fn:
                                             filename = raw_fn
-                                file_bytes = part[hdr_end + 4:].rstrip(b"\r\n--")
+                                raw_bytes = part[hdr_end + 4:]
+                                if raw_bytes.endswith(b"\r\n"):
+                                    raw_bytes = raw_bytes[:-2]
+                                file_bytes = raw_bytes
                                 break
 
-                try:
-                    from neural_gallery.vault_storage import get_vault_config, ensure_vault_structure
-                    cfg = get_vault_config()
-                    vault_dirs = ensure_vault_structure(Path(cfg["vault_path"]))
-                    incoming_folder = vault_dirs["originals"] / "Imports"
-                except Exception:
-                    incoming_folder = Path.home() / "Pictures" / "Neural Gallery Imports"
+                env_incoming = os.environ.get("NEURAL_GALLERY_INCOMING_DIR")
+                if env_incoming:
+                    incoming_folder = Path(env_incoming)
+                else:
+                    try:
+                        from neural_gallery.vault_storage import get_vault_config, ensure_vault_structure
+                        cfg = get_vault_config()
+                        vault_dirs = ensure_vault_structure(Path(cfg["vault_path"]))
+                        incoming_folder = vault_dirs["originals"] / "Imports"
+                    except Exception:
+                        incoming_folder = Path.home() / "Pictures" / "Neural Gallery Imports"
                 res = get_sync_engine().ingest_bytes(filename, file_bytes, incoming_folder, db_path)
                 self._json(200, res)
                 return
@@ -1474,6 +1480,7 @@ def make_handler(db_path: Path):
                     return
                 folder = payload.get("folder")
                 copy_to_vault = payload.get("copy_to_vault")
+                is_imported = payload.get("is_imported", True)
                 if copy_to_vault is None:
                     try:
                         from neural_gallery.vault_storage import get_vault_config
@@ -1484,11 +1491,30 @@ def make_handler(db_path: Path):
                     self._json(400, {"error": "folder is required"})
                     return
                 try:
-                    summary = scan_folder(Path(folder), db_path, copy_to_vault=copy_to_vault)
+                    summary = scan_folder(Path(folder), db_path, copy_to_vault=copy_to_vault, is_imported=is_imported)
                 except NotADirectoryError:
                     self._json(400, {"error": "that folder does not exist"})
                     return
                 self._json(200, summary)
+                return
+
+            if parsed.path == "/api/imports/save":
+                payload = self._payload()
+                if payload is None:
+                    return
+                raw_ids = payload.get("ids")
+                if raw_ids is None and "id" in payload:
+                    raw_ids = [payload.get("id")]
+                if not isinstance(raw_ids, list) or not raw_ids:
+                    self._json(400, {"error": "valid id or ids list is required"})
+                    return
+                connection = connect(db_path)
+                try:
+                    valid_ids = [fid for fid in raw_ids if isinstance(fid, int)]
+                    res = save_imported_photos(connection, valid_ids)
+                    self._json(200, res)
+                finally:
+                    connection.close()
                 return
 
             if parsed.path == "/api/vault/storage":
@@ -1518,6 +1544,7 @@ def make_handler(db_path: Path):
 
             valid_post_paths = {
                 "/api/label",
+                "/api/imports/save",
                 "/api/trash",
                 "/api/restore",
                 "/api/trash/empty",
@@ -1559,6 +1586,12 @@ def make_handler(db_path: Path):
                         self._json(400, {"error": "id and label are required"})
                         return
                     stored = None if label == "" else label
+                    cat = None
+                    if label == "keep":
+                        try:
+                            cat = auto_sort_imported_photo(connection, file_id)
+                        except Exception:
+                            pass
                     cursor = connection.execute(
                         "UPDATE files SET label = ? WHERE id = ?",
                         (stored, file_id),
@@ -1567,7 +1600,10 @@ def make_handler(db_path: Path):
                     if cursor.rowcount != 1:
                         self._json(404, {"error": "not indexed"})
                         return
-                    self._json(200, {"id": file_id, "label": stored})
+                    res_payload = {"id": file_id, "label": stored}
+                    if cat:
+                        res_payload["category"] = cat
+                    self._json(200, res_payload)
                     return
 
                 if parsed.path == "/api/favorite":
@@ -1876,8 +1912,9 @@ def _thumbnail(path: Path, edge: int = 1600) -> bytes:
 
 def serve(db_path: Path, port: int = 8765) -> None:
     try:
-        from neural_gallery.sync import start_tunnel_auto, stop_tunnel
-        start_tunnel_auto(port)
+        from neural_gallery.sync import is_tunnel_enabled, start_tunnel_auto
+        if is_tunnel_enabled():
+            start_tunnel_auto(port)
     except Exception:
         pass
 

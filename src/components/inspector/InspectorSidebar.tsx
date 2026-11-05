@@ -111,6 +111,7 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
 }) => {
   const [detail, setDetail] = useState<PhotoItem | null>(photo);
   const [copiedPath, setCopiedPath] = useState(false);
+  const [copiedName, setCopiedName] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
   // Sync state and fetch deep details when selected photo changes
@@ -195,6 +196,13 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
     setTimeout(() => setCopiedPath(false), 2000);
   };
 
+  const handleCopyFileName = () => {
+    if (!fileName) return;
+    navigator.clipboard.writeText(fileName);
+    setCopiedName(true);
+    setTimeout(() => setCopiedName(false), 2000);
+  };
+
   return (
     <aside className="w-80 flex-shrink-0 border-l border-[var(--glass-border)] bg-[var(--glass-sidebar)] backdrop-blur-xl flex flex-col h-full overflow-y-auto select-none">
       {/* Header */}
@@ -275,8 +283,22 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
           </button>
         </div>
 
-        <div className="text-xs font-bold text-[var(--text-main)] truncate max-w-full text-center" title={fileName}>
-          {fileName}
+        <div className="flex items-center justify-center gap-1.5 w-full mt-0.5 px-2">
+          <span className="text-xs font-bold text-[var(--text-main)] truncate max-w-[210px]" title={fileName}>
+            {fileName}
+          </span>
+          <button
+            onClick={handleCopyFileName}
+            className={`p-1 rounded-md transition-all shrink-0 hover:scale-110 active:scale-95 ${
+              copiedName
+                ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                : "text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--button-hover)]"
+            }`}
+            title={copiedName ? "Copied image name!" : "Copy image name"}
+            aria-label="Copy image name"
+          >
+            {copiedName ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+          </button>
         </div>
         <div className="text-[10px] text-[var(--text-muted)] font-mono mt-0.5 text-center">
           {dimensions.res !== "Not recorded" ? `${dimensions.res} · ` : ""}

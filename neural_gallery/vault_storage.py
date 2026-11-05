@@ -17,6 +17,11 @@ CONFIG_FILE_NAME = "vault_config.json"
 
 
 def _config_dir() -> Path:
+    env_dir = os.environ.get("NEURAL_GALLERY_CONFIG_DIR")
+    if env_dir:
+        p = Path(env_dir)
+        p.mkdir(parents=True, exist_ok=True)
+        return p
     from neural_gallery.db import default_db
     return default_db().parent
 

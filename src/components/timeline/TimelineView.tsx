@@ -25,6 +25,10 @@ interface TimelineViewProps {
   catalogStyle: CatalogStyle;
   sortOrder?: string;
   isTrashCategory?: boolean;
+  isImportCategory?: boolean;
+  onSaveImportPhoto?: (id: number) => void;
+  onSaveAllImports?: () => void;
+  onTrashImportPhoto?: (id: number) => void;
   onRestorePhoto?: (id: number) => void;
   onEmptyTrash?: () => void;
   onRestoreAll?: () => void;
@@ -145,6 +149,10 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   catalogStyle,
   sortOrder = "date_desc",
   isTrashCategory = false,
+  isImportCategory = false,
+  onSaveImportPhoto,
+  onSaveAllImports,
+  onTrashImportPhoto,
   onRestorePhoto,
   onEmptyTrash,
   onRestoreAll,
@@ -222,14 +230,16 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 text-center select-none">
         <div className="w-16 h-16 rounded-2xl bg-[var(--accent-soft)] flex items-center justify-center text-3xl mb-4">
-          {isTrashCategory ? "🗑️" : "🖼️"}
+          {isTrashCategory ? "🗑️" : isImportCategory ? "📥" : "🖼️"}
         </div>
         <h3 className="text-base font-semibold text-[var(--text-main)] mb-1">
-          {isTrashCategory ? "Trash is Empty" : "No Photos Found"}
+          {isTrashCategory ? "Trash is Empty" : isImportCategory ? "No Pending Imports" : "No Photos Found"}
         </h3>
         <p className="text-xs text-[var(--text-muted)] max-w-sm">
           {isTrashCategory
             ? "No deleted photos currently in the vault trash bin."
+            : isImportCategory
+            ? "All imported photos have been reviewed and sorted into their library categories."
             : "Click 'Import' above to scan any folder on your Mac or drag and drop photos here."}
         </p>
       </div>
@@ -238,6 +248,38 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
   return (
     <div className="flex-1 overflow-y-auto p-2 sm:p-4 select-none space-y-4 sm:space-y-6">
+      {/* Imports Review Banner */}
+      {isImportCategory && (
+        <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/25 flex flex-wrap items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center text-lg">
+              📥
+            </div>
+            <div>
+              <div className="text-xs font-bold text-[var(--text-main)]">
+                Imported Media ({photos.length} {photos.length === 1 ? "photo" : "photos"} to review)
+              </div>
+              <div className="text-[11px] text-[var(--text-muted)]">
+                Select photos to keep or remove. Marking photos as "Saved" automatically sorts them into their category folder.
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {onSaveAllImports && photos.length > 0 && (
+              <button
+                onClick={onSaveAllImports}
+                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all"
+                title="Mark all imported photos as saved and sort into categories"
+              >
+                <Check size={13} className="stroke-[2.5]" />
+                <span>Save All to Library</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Trash Bin Banner */}
       {isTrashCategory && (
         <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/25 flex flex-wrap items-center justify-between gap-3 shadow-sm">
@@ -366,8 +408,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   </thead>
                   <tbody className="divide-y divide-[var(--glass-border)]">
                     {section.photos.map((photo) => {
-                      const isSelected =
-                        selectedPhotoIds.has(photo.id) || selectedPhoto?.id === photo.id;
+                      const isSelected = selectedPhotoIds.has(photo.id);
                       const isMultiSelected = selectedPhotoIds.has(photo.id);
                       const thumbSrc = photo.thumb || `/media/${photo.id}?w=160`;
                       const displayName = photo.file_name || photo.name || `Photo #${photo.id}`;
@@ -382,6 +423,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                       return (
                         <tr
                           key={photo.id}
+                          data-photo-item="true"
                           draggable={true}
                           onDragStart={(e) => {
                             const ids = selectedPhotoIds.has(photo.id)
@@ -499,7 +541,29 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                                 <Maximize2 size={13} />
                               </button>
 
-                              {isTrashCategory || photo.is_trashed ? (
+                              {isImportCategory ? (
+                                <div className="flex items-center gap-1">
+                                  {onSaveImportPhoto && (
+                                    <button
+                                      onClick={() => onSaveImportPhoto(photo.id)}
+                                      className="px-2 py-0.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold flex items-center gap-1 shadow-sm transition-all"
+                                      title="Mark as Saved & Auto-sort"
+                                    >
+                                      <Check size={11} className="stroke-[2.5]" />
+                                      <span>Save</span>
+                                    </button>
+                                  )}
+                                  {onTrashImportPhoto && (
+                                    <button
+                                      onClick={() => onTrashImportPhoto(photo.id)}
+                                      className="p-1 rounded text-rose-500 hover:bg-rose-500/15"
+                                      title="Move to Trash"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  )}
+                                </div>
+                              ) : isTrashCategory || photo.is_trashed ? (
                                 onRestorePhoto && (
                                   <button
                                     onClick={() => onRestorePhoto(photo.id)}
@@ -542,8 +606,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                 }`}
               >
                 {section.photos.map((photo) => {
-                  const isSelected =
-                    selectedPhotoIds.has(photo.id) || selectedPhoto?.id === photo.id;
+                  const isSelected = selectedPhotoIds.has(photo.id);
                   const isMultiSelected = selectedPhotoIds.has(photo.id);
                   const thumbSrc =
                     photo.thumb ||
@@ -574,6 +637,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   return (
                     <div
                       key={photo.id}
+                      data-photo-item="true"
                       draggable={true}
                       onDragStart={(e) => {
                         const ids = selectedPhotoIds.has(photo.id)
@@ -652,8 +716,36 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                           </div>
                         )}
 
-                        {/* Favorite or Put Back Button */}
-                        {isTrashCategory || photo.is_trashed ? (
+                        {/* Import Actions or Favorite / Put Back Button */}
+                        {isImportCategory ? (
+                          <div className="absolute top-2 right-2 flex items-center gap-1.5 z-10">
+                            {onSaveImportPhoto && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onSaveImportPhoto(photo.id);
+                                }}
+                                className="px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold flex items-center gap-1 shadow-md transition-all hover:scale-105"
+                                title="Mark as Saved & Auto-sort"
+                              >
+                                <Check size={12} className="stroke-[2.5]" />
+                                <span className="hidden sm:inline">Save</span>
+                              </button>
+                            )}
+                            {onTrashImportPhoto && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onTrashImportPhoto(photo.id);
+                                }}
+                                className="p-1.5 rounded-lg bg-rose-600/90 hover:bg-rose-600 text-white shadow-md transition-all hover:scale-105"
+                                title="Move to Trash"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            )}
+                          </div>
+                        ) : isTrashCategory || photo.is_trashed ? (
                           onRestorePhoto && (
                             <button
                               onClick={(e) => {

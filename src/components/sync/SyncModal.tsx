@@ -20,17 +20,20 @@ export const SyncModal: React.FC<SyncModalProps> = ({
   onUnpairDevice,
   onToggleTunnel,
 }) => {
-  const [addressMode, setAddressMode] = useState<"tunnel" | "ip" | "hostname">("tunnel");
+  // Compute clean PIN and target hosts
+  const cleanPin = (syncStatus.sas_pin || "").replace(/\s+/g, "").trim();
+  const port = syncStatus.port || 8765;
+  const isTunnelActive = Boolean(syncStatus.tunnel_enabled && syncStatus.tunnel_url);
+
+  // Universal Tunnel is switched OFF by default; default to local Wi-Fi IP unless tunnel is actively turned on
+  const [addressMode, setAddressMode] = useState<"tunnel" | "ip" | "hostname">(
+    syncStatus.tunnel_enabled && syncStatus.tunnel_url ? "tunnel" : "ip"
+  );
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
   const [copied, setCopied] = useState<boolean>(false);
   const [showTroubleshoot, setShowTroubleshoot] = useState<boolean>(false);
   const [isTogglingTunnel, setIsTogglingTunnel] = useState<boolean>(false);
   const [countdown, setCountdown] = useState<number>(syncStatus.pin_expires_in ?? 60);
-
-  // Compute clean PIN and target hosts
-  const cleanPin = (syncStatus.sas_pin || "").replace(/\s+/g, "").trim();
-  const port = syncStatus.port || 8765;
-  const isTunnelActive = syncStatus.tunnel_enabled !== false;
 
   const ipHost =
     syncStatus.local_ip && syncStatus.local_ip !== "127.0.0.1" && syncStatus.local_ip !== "0.0.0.0"
@@ -43,12 +46,11 @@ export const SyncModal: React.FC<SyncModalProps> = ({
 
   const tunnelUrl =
     syncStatus.pwa_url_tunnel ||
-    (syncStatus.tunnel_url ? `${syncStatus.tunnel_url}/sync?pin=${cleanPin}` : null) ||
-    `https://flower-teaches-cast-drive.trycloudflare.com/sync?pin=${cleanPin}`;
+    (syncStatus.tunnel_url ? `${syncStatus.tunnel_url}/sync?pin=${cleanPin}` : "");
 
-  let directConnectUrl = tunnelUrl;
-  if (addressMode === "ip") {
-    directConnectUrl = `http://${ipHost}:${port}/sync?pin=${cleanPin}`;
+  let directConnectUrl = `http://${ipHost}:${port}/sync?pin=${cleanPin}`;
+  if (addressMode === "tunnel") {
+    directConnectUrl = tunnelUrl;
   } else if (addressMode === "hostname") {
     directConnectUrl = `http://${nameHost}:${port}/sync?pin=${cleanPin}`;
   }
@@ -209,6 +211,32 @@ export const SyncModal: React.FC<SyncModalProps> = ({
               </button>
             </div>
 
+            {/* Mode-specific platform guidance */}
+            {addressMode === "hostname" && (
+              <div className="w-full text-[11px] text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1.5 rounded-xl mb-3 text-left flex items-start gap-1.5">
+                <span className="shrink-0 text-xs">⚠️</span>
+                <span>
+                  <strong>Apple Devices Only</strong> (iPhone, iPad, Mac). Android Chrome does not resolve <code>.local</code> domains — switch to <strong>Local IP</strong> or <strong>Universal Tunnel</strong> for Android.
+                </span>
+              </div>
+            )}
+            {addressMode === "ip" && (
+              <div className="w-full text-[11px] text-blue-600 dark:text-blue-400 bg-blue-500/10 border border-blue-500/25 px-2.5 py-1.5 rounded-xl mb-3 text-left flex items-start gap-1.5">
+                <span className="shrink-0 text-xs">📶</span>
+                <span>
+                  Connect from <strong>iPhone or Android</strong> on the same Wi-Fi. (In Android Chrome, ensure URL begins with <code>http://</code>, not <code>https://</code>).
+                </span>
+              </div>
+            )}
+            {addressMode === "tunnel" && isTunnelActive && (
+              <div className="w-full text-[11px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-1.5 rounded-xl mb-3 text-left flex items-start gap-1.5">
+                <span className="shrink-0 text-xs">🌐</span>
+                <span>
+                  <strong>Universal Compatibility</strong>: Works flawlessly on all Android phones, iPhones, and PCs across any Wi-Fi or mobile hotspot.
+                </span>
+              </div>
+            )}
+
             {/* Universal Mode: On/Off Switch & Details */}
             {addressMode === "tunnel" && (
               <div className="w-full flex items-center justify-between p-2.5 mb-3 rounded-xl bg-[var(--card)] border border-[var(--glass-border)] text-left">
@@ -246,24 +274,52 @@ export const SyncModal: React.FC<SyncModalProps> = ({
                   disabled={isTogglingTunnel}
                   className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                     isTunnelActive ? "bg-emerald-500" : "bg-slate-600"
-                  } ${isTogglingTunnel ? "opacity-60 cursor-wait" : ""}`}
+                  } ${isTogglingTunnel ? "opacity-80" : ""}`}
                   title={
-                    isTunnelActive
+                    isTogglingTunnel
+                      ? "Processing tunnel state..."
+                      : isTunnelActive
                       ? "Click to switch OFF Universal Tunnel"
                       : "Click to switch ON Universal Tunnel"
                   }
                 >
                   <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                    className={`pointer-events-none flex items-center justify-center h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
                       isTunnelActive ? "translate-x-5" : "translate-x-0"
                     }`}
-                  />
+                  >
+                    {isTogglingTunnel && (
+                      <div className="w-2.5 h-2.5 rounded-full border-2 border-emerald-600 border-t-transparent animate-spin" />
+                    )}
+                  </span>
                 </button>
               </div>
             )}
 
-            {/* If Universal is selected but toggled OFF: Show Air-Gapped State */}
-            {addressMode === "tunnel" && !isTunnelActive ? (
+            {/* If Tunnel is actively processing (turning ON or OFF): Show High-Tech Processing Loader */}
+            {addressMode === "tunnel" && isTogglingTunnel ? (
+              <div className="p-6 flex flex-col items-center text-center space-y-3.5 my-1 w-full bg-[var(--card)]/60 rounded-xl border border-emerald-500/30 animate-fadeIn shadow-lg">
+                <div className="relative flex items-center justify-center">
+                  <div className="w-14 h-14 rounded-full border-3 border-emerald-500/20 border-t-emerald-500 animate-spin" />
+                  <div className="absolute text-xl">🌐</div>
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-[var(--text-main)] flex items-center justify-center gap-2">
+                    <span>
+                      {isTunnelActive
+                        ? "Disconnecting Universal Tunnel..."
+                        : "Establishing Universal Tunnel..."}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[var(--text-muted)] max-w-xs mt-1 leading-relaxed">
+                    Connecting to Cloudflare edge over encrypted TLS. Please wait 2–3 seconds...
+                  </p>
+                </div>
+                <div className="w-full max-w-xs bg-slate-700/30 h-1.5 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-emerald-500 to-blue-500 rounded-full animate-pulse w-3/4" />
+                </div>
+              </div>
+            ) : addressMode === "tunnel" && !isTunnelActive ? (
               <div className="p-5 flex flex-col items-center text-center space-y-2.5 my-1 w-full bg-[var(--card)]/40 rounded-xl border border-[var(--glass-border)]">
                 <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-2xl">
                   🛡️
@@ -277,16 +333,16 @@ export const SyncModal: React.FC<SyncModalProps> = ({
                 <div className="flex items-center gap-2 pt-1">
                   <button
                     onClick={() => setAddressMode("ip")}
-                    className="px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white text-[11px] font-medium shadow-sm hover:opacity-90 transition-all"
+                    className="px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white text-[11px] font-medium shadow-sm hover:opacity-90 transition-all cursor-pointer"
                   >
                     Use Local IP 📶
                   </button>
                   <button
                     onClick={() => handleToggleTunnel(true)}
                     disabled={isTogglingTunnel}
-                    className="px-3 py-1.5 rounded-lg border border-[var(--button-border)] bg-[var(--button-bg)] text-[11px] text-[var(--text-main)] hover:bg-[var(--button-hover)] transition-all"
+                    className="px-3 py-1.5 rounded-lg border border-[var(--button-border)] bg-[var(--button-bg)] text-[11px] text-[var(--text-main)] hover:bg-[var(--button-hover)] transition-all cursor-pointer flex items-center gap-1.5"
                   >
-                    Turn ON Tunnel
+                    <span>Turn ON Tunnel</span>
                   </button>
                 </div>
               </div>

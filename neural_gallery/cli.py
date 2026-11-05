@@ -81,7 +81,7 @@ def main(argv: list[str] | None = None) -> int:
     db_path = _db(args.db)
     try:
         if args.command == "scan":
-            summary = scan_folder(args.folder, db_path)
+            summary = scan_folder(args.folder, db_path, is_imported=True)
             print(
                 f"seen {summary['seen']}, added {summary['added']}, "
                 f"updated {summary['updated']}, unchanged {summary['unchanged']}, "

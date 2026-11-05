@@ -87,7 +87,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <img
             src="/icon.png"
             alt="App Icon"
-            className="w-8 h-8 rounded-lg shadow-sm object-cover"
+            className="w-8 h-8 object-contain drop-shadow-sm select-none transition-transform hover:scale-105 active:scale-95"
             onError={(e) => {
               (e.target as HTMLImageElement).src =
                 "https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Framed%20picture/3D/framed_picture_3d.png";
@@ -791,25 +791,45 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
 
             <button
-              onClick={() => onSelectCategory("inbox")}
+              onClick={() => onSelectCategory("imports")}
               className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
-                currentCategory === "inbox"
+                currentCategory === "imports"
                   ? "bg-[var(--accent)] text-white shadow-sm"
                   : "text-[var(--text-main)] hover:bg-[var(--button-hover)]"
               }`}
             >
               <div className="flex items-center gap-2.5">
                 <img
-                  src="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Inbox%20tray/3D/inbox_tray_3d.png"
+                  src="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Card%20index%20dividers/3D/card_index_dividers_3d.png"
                   alt=""
                   className="w-4 h-4 object-contain"
                 />
-                <span>To sort</span>
+                <span>Imports</span>
               </div>
-              <span className="text-[11px] text-[var(--text-muted)]">{stats.unlabeled}</span>
+              <div className="flex items-center gap-1.5">
+                {(stats.imports ?? 0) > 0 ? (
+                  <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-semibold">
+                    {stats.imports}
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-[var(--text-muted)]">0</span>
+                )}
+              </div>
             </button>
+          </div>
+        </div>
 
-            {/* Hidden Vault with 3D Lock/Unlock Icon & Nested Private Folders */}
+        {/* Section 6: Security & Privacy (Hidden Vault) */}
+        <div>
+          <div className="text-[11px] font-semibold text-[var(--text-faint)] uppercase tracking-wider px-2 mb-1.5 flex items-center justify-between">
+            <span>Security & Privacy</span>
+            {isHiddenVaultUnlocked && (
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-semibold">
+                Unlocked
+              </span>
+            )}
+          </div>
+          <div className="space-y-0.5">
             <div>
               <div
                 onClick={() => onSelectCategory("hidden")}
@@ -831,20 +851,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   />
                   <span>Hidden Vault</span>
                 </div>
+                {/* Zero-knowledge: No count or number shown for Hidden Vault */}
                 <div className="flex items-center gap-1.5">
-                  <span className={`text-[11px] ${currentCategory === "hidden" ? "text-white/80" : "text-[var(--text-muted)]"}`}>
-                    {stats.hidden}
-                  </span>
                   {isHiddenVaultUnlocked && onLockHiddenVault && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         onLockHiddenVault();
                       }}
-                      className="p-0.5 rounded hover:bg-black/10 text-[10px]"
+                      className="p-1 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-[11px] transition-all"
                       title="Lock Hidden Vault"
                     >
-                      🔒
+                      🔒 Lock
                     </button>
                   )}
                 </div>
@@ -869,34 +887,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           <Folder size={12} className={isSelected ? "text-white" : "text-indigo-400"} />
                           <span className="truncate">{hf.name}</span>
                         </div>
-                        <span className="text-[10px] opacity-75 font-mono shrink-0 ml-1">
-                          {hf.count}
-                        </span>
                       </div>
                     );
                   })}
                 </div>
               )}
             </div>
-
-            <button
-              onClick={() => onSelectCategory("imports")}
-              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
-                currentCategory === "imports"
-                  ? "bg-[var(--accent)] text-white shadow-sm"
-                  : "text-[var(--text-main)] hover:bg-[var(--button-hover)]"
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <img
-                  src="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Card%20index%20dividers/3D/card_index_dividers_3d.png"
-                  alt=""
-                  className="w-4 h-4 object-contain"
-                />
-                <span>Imports</span>
-              </div>
-              <span className="text-[11px] text-[var(--text-muted)]">{stats.imports ?? stats.total}</span>
-            </button>
           </div>
         </div>
       </div>

@@ -12,10 +12,10 @@ from neural_gallery.db import connect
 from neural_gallery.duplicates import rebuild_groups
 
 IMAGE_SUFFIXES = {
-    ".jpg", ".jpeg", ".png", ".webp", ".gif", ".tif", ".tiff", ".heic",
+    ".jpg", ".jpeg", ".png", ".webp", ".gif", ".tif", ".tiff", ".heic", ".heif", ".avif",
     ".dng", ".raw", ".cr2", ".cr3", ".nef", ".arw", ".orf", ".rw2"
 }
-VIDEO_SUFFIXES = {".mov", ".mp4", ".m4v", ".webm"}
+VIDEO_SUFFIXES = {".mov", ".mp4", ".m4v", ".webm", ".mkv", ".avi", ".3gp"}
 ALL_MEDIA_SUFFIXES = IMAGE_SUFFIXES | VIDEO_SUFFIXES
 
 _RAW_SUFFIXES = {".dng", ".raw", ".cr2", ".cr3", ".nef", ".arw", ".orf", ".rw2"}
@@ -165,6 +165,7 @@ def index_file(path: Path) -> dict | None:
             "is_document": 0,
             "is_hidden": 0,
             "is_trashed": 0,
+            "is_imported": 0,
             "quality_score": 8.5,
             "blur_score": 1.0,
             "dhash": None,
@@ -301,6 +302,7 @@ def index_file(path: Path) -> dict | None:
         "is_document": is_document,
         "is_hidden": 0,
         "is_trashed": 0,
+        "is_imported": 0,
         "quality_score": sharpness,
         "blur_score": round(max(0.0, 10.0 - sharpness), 1),
         "dhash": digest,
@@ -309,7 +311,7 @@ def index_file(path: Path) -> dict | None:
     }
 
 
-def scan_folder(folder: Path, db_path: Path, copy_to_vault: bool = False) -> dict:
+def scan_folder(folder: Path, db_path: Path, copy_to_vault: bool = False, is_imported: bool = False) -> dict:
     folder = folder.expanduser().resolve()
     if not folder.is_dir():
         raise NotADirectoryError(str(folder))
@@ -338,6 +340,9 @@ def scan_folder(folder: Path, db_path: Path, copy_to_vault: bool = False) -> dic
                 unreadable += 1
                 continue
 
+            if is_imported or folder.name == "Imports":
+                record["is_imported"] = 1
+
             # Managed Vault Ingestion (Safe SSD Storage)
             if copy_to_vault:
                 try:
@@ -365,7 +370,7 @@ def scan_folder(folder: Path, db_path: Path, copy_to_vault: bool = False) -> dic
                         aperture_f_number, shutter_speed_seconds, iso_equivalent, color_space, captured_at,
                         latitude, longitude, altitude_meters, heading, location_name,
                         is_favorite, is_screenshot, is_video, duration_ms, is_live_photo, is_portrait,
-                        is_raw, is_panorama, is_selfie, is_document, is_hidden, is_trashed,
+                        is_raw, is_panorama, is_selfie, is_document, is_hidden, is_trashed, is_imported,
                         quality_score, blur_score, dhash, category, scanned_at
                     )
                     VALUES (
@@ -374,7 +379,7 @@ def scan_folder(folder: Path, db_path: Path, copy_to_vault: bool = False) -> dic
                         :aperture_f_number, :shutter_speed_seconds, :iso_equivalent, :color_space, :captured_at,
                         :latitude, :longitude, :altitude_meters, :heading, :location_name,
                         :is_favorite, :is_screenshot, :is_video, :duration_ms, :is_live_photo, :is_portrait,
-                        :is_raw, :is_panorama, :is_selfie, :is_document, :is_hidden, :is_trashed,
+                        :is_raw, :is_panorama, :is_selfie, :is_document, :is_hidden, :is_trashed, :is_imported,
                         :quality_score, :blur_score, :dhash, :category, :scanned_at
                     )
                     """,
@@ -395,7 +400,7 @@ def scan_folder(folder: Path, db_path: Path, copy_to_vault: bool = False) -> dic
                         is_favorite = :is_favorite, is_screenshot = :is_screenshot, is_video = :is_video,
                         is_portrait = :is_portrait, is_raw = :is_raw, is_panorama = :is_panorama,
                         is_selfie = :is_selfie, is_document = :is_document, quality_score = :quality_score,
-                        blur_score = :blur_score, dhash = :dhash, category = :category, scanned_at = :scanned_at
+                        blur_score = :blur_score, dhash = :dhash, category = :category, is_imported = :is_imported, scanned_at = :scanned_at
                     WHERE path = :path
                     """,
                     record,
