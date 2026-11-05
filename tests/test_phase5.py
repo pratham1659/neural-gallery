@@ -21,6 +21,10 @@ class TestPhase5P2PSync(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db_path = Path(self.temp_dir.name) / "test_sync.sqlite"
+        self.test_incoming = Path(self.temp_dir.name) / "test_imports"
+        self.test_incoming.mkdir(parents=True, exist_ok=True)
+        import os
+        os.environ["NEURAL_GALLERY_INCOMING_DIR"] = str(self.test_incoming)
         connection = connect(self.db_path)
         connection.close()
 
@@ -28,6 +32,8 @@ class TestPhase5P2PSync(unittest.TestCase):
         self.server, self.port = self._start_server()
 
     def tearDown(self):
+        import os
+        os.environ.pop("NEURAL_GALLERY_INCOMING_DIR", None)
         self.server.shutdown()
         self.server.server_close()
         self.temp_dir.cleanup()

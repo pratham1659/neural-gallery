@@ -4,6 +4,7 @@ import {
   Trash2,
   RotateCcw,
   X,
+  Check,
   CheckSquare,
   List,
   LayoutGrid,
@@ -49,6 +50,8 @@ interface HeaderProps {
   onUnhideSelected?: () => void;
   isTrashCategory?: boolean;
   isHiddenCategory?: boolean;
+  isImportCategory?: boolean;
+  onSaveSelectedImports?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -83,6 +86,8 @@ export const Header: React.FC<HeaderProps> = ({
   onUnhideSelected,
   isTrashCategory = false,
   isHiddenCategory = false,
+  isImportCategory = false,
+  onSaveSelectedImports,
 }) => {
   return (
     <header className="h-14 border-b border-[var(--glass-border)] bg-[var(--glass-panel)] backdrop-blur-xl flex items-center justify-between px-2.5 sm:px-4 z-20 select-none gap-2 min-w-0 w-full overflow-hidden">
@@ -276,6 +281,18 @@ export const Header: React.FC<HeaderProps> = ({
               All
             </button>
           )}
+
+          {/* Save / Keep Imported Photos Action */}
+          {isImportCategory && onSaveSelectedImports ? (
+            <button
+              onClick={onSaveSelectedImports}
+              className="px-2.5 py-0.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold flex items-center gap-1 shadow-sm transition-all shrink-0 whitespace-nowrap"
+              title="Save selected photos into library (auto-sorts into category folders)"
+            >
+              <Check size={12} className="stroke-[2.5]" />
+              <span>Mark as Saved</span>
+            </button>
+          ) : null}
 
           {/* Delete or Put Back Action */}
           {isTrashCategory && onRestoreSelected ? (

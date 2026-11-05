@@ -94,10 +94,23 @@ class TestPhase6ReactFrontend(unittest.TestCase):
         self.assertIn(b"assets/index-", data)
 
     def test_http_serves_preview_fallback(self):
-        """Test GET /preview still serves original standalone HTML prototype."""
+        """Test GET /preview routes to main application bundle."""
         status, data, _ = self._request("/preview")
         self.assertEqual(status, 200)
-        self.assertIn(b"Neural Gallery Vault - Interactive UI Prototype", data)
+        self.assertIn(b'<div id="root"></div>', data)
+
+    def test_universal_tunnel_disabled_by_default(self):
+        """Test Universal Tunnel is switched OFF by default for privacy."""
+        from neural_gallery.sync import is_tunnel_enabled, get_tunnel_url
+        self.assertFalse(is_tunnel_enabled())
+        self.assertIsNone(get_tunnel_url())
+
+        # Test sync status endpoint reports tunnel_enabled=False
+        status, data, _ = self._request("/api/sync/status")
+        self.assertEqual(status, 200)
+        body = json.loads(data.decode("utf-8"))
+        self.assertFalse(body.get("tunnel_enabled"))
+        self.assertIsNone(body.get("tunnel_url"))
 
 
 if __name__ == "__main__":

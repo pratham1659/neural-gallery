@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS files (
     is_document INTEGER NOT NULL DEFAULT 0,
     is_hidden INTEGER NOT NULL DEFAULT 0,
     is_trashed INTEGER NOT NULL DEFAULT 0,
+    is_imported INTEGER NOT NULL DEFAULT 0,
     
     -- Quality, Aesthetic, & Clustering
     quality_score REAL DEFAULT 5.0,
@@ -122,6 +123,7 @@ INDEXES = """
 -- Indices for performance
 CREATE INDEX IF NOT EXISTS files_label ON files(label);
 CREATE INDEX IF NOT EXISTS files_category ON files(category);
+CREATE INDEX IF NOT EXISTS files_imported ON files(is_imported);
 CREATE INDEX IF NOT EXISTS files_favorite ON files(is_favorite);
 CREATE INDEX IF NOT EXISTS files_media_types ON files(is_video, is_screenshot, is_raw, is_portrait, is_live_photo);
 CREATE INDEX IF NOT EXISTS files_location ON files(latitude, longitude);
@@ -169,6 +171,7 @@ def migrate(connection: sqlite3.Connection) -> None:
         "is_document": "INTEGER NOT NULL DEFAULT 0",
         "is_hidden": "INTEGER NOT NULL DEFAULT 0",
         "is_trashed": "INTEGER NOT NULL DEFAULT 0",
+        "is_imported": "INTEGER NOT NULL DEFAULT 0",
         "quality_score": "REAL DEFAULT 5.0",
         "blur_score": "REAL DEFAULT 0.0",
         "category": "TEXT DEFAULT 'all'",

@@ -352,11 +352,12 @@ export const HiddenVaultView: React.FC<HiddenVaultViewProps> = ({
               return (
                 <div
                   key={photo.id}
+                  data-photo-item="true"
                   onClick={(e) => onSelectPhoto(photo, e)}
                   onDoubleClick={() => onEnlargePhoto(photo)}
                   className={`group relative aspect-square rounded-2xl overflow-hidden bg-[var(--card)] border transition-all cursor-pointer select-none ${
                     isSelected
-                      ? "ring-2 ring-indigo-500 shadow-md border-indigo-500 scale-[0.98]"
+                      ? "ring-2 ring-indigo-500 shadow-md border-indigo-500"
                       : "border-[var(--glass-border)] hover:border-indigo-400/50 hover:shadow"
                   }`}
                 >

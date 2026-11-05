@@ -206,7 +206,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
           </thead>
           <tbody className="divide-y divide-[var(--glass-border)]">
             {photos.map((photo) => {
-              const isSelected = selectedPhoto?.id === photo.id;
+              const isSelected = selectedPhotoIds.has(photo.id);
               const isMultiSelected = selectedPhotoIds.has(photo.id);
               const thumbSrc = photo.thumb || `/media/${photo.id}?w=120`;
               const displayName = photo.file_name || photo.name || `Photo #${photo.id}`;
@@ -214,6 +214,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
               return (
                 <tr
                   key={photo.id}
+                  data-photo-item="true"
                   onClick={(e) => onPhotoClick(photo, e)}
                   onDoubleClick={() => onEnlargePhoto(photo)}
                   className={`group cursor-pointer transition-colors ${
